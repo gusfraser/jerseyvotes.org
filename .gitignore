@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Data files (too large for git)
+*.csv
+*.xml
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

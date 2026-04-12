@@ -89,13 +89,24 @@ export default function AboutPage() {
             Open source
           </h2>
           <p>
-            Jersey Votes is fully open source. The code, data pipeline, and
-            analysis tools are all publicly available. Contributions, bug
-            reports, and feature suggestions are welcome.
+            Jersey Votes is fully open source under the{" "}
+            <a
+              href="https://github.com/gusfraser/jerseyvotes.org/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-red-700 hover:underline font-medium"
+            >
+              MIT License
+            </a>
+            . The code, data pipeline, and analysis tools are all publicly
+            available. Contributions, bug reports, and feature suggestions are
+            welcome.
           </p>
           <p className="mt-3">
             <a
-              href="#"
+              href="https://github.com/gusfraser/jerseyvotes.org"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-red-700 hover:underline font-medium"
             >
               View on GitHub &rarr;

@@ -49,7 +49,7 @@ export function Nav() {
               <rect width="32" height="32" rx="6" fill="#991b1b"/>
               <path d="M9 16.5l4.5 4.5L23 11" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Jersey Votes
+            JerseyVotes.org
           </Link>
 
           {/* Desktop nav */}

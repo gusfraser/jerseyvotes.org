@@ -60,7 +60,7 @@ export function AlignmentHeatmap() {
   const labelWidth = isMobile ? 100 : 160;
   const labelFontSize = isMobile ? 6 : 9;
   const topPadding = isMobile ? 25 : 40;
-  const svgWidth = labelWidth + n * cellSize + 10;
+  const svgWidth = labelWidth + n * cellSize + 80;
   const svgHeight = labelWidth + topPadding + n * cellSize;
 
   return (

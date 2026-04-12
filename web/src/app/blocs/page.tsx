@@ -2,7 +2,7 @@ import { BlocsChart } from "./chart";
 
 export default function BlocsPage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="text-3xl font-bold mb-2">Voting Blocs</h1>
       <p className="text-gray-600 mb-8 max-w-3xl">
         This chart shows where each member sits politically, based entirely on
@@ -72,7 +72,15 @@ export default function BlocsPage() {
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
             <p className="font-semibold text-gray-900 mb-1">Methodology</p>
             <p>
-              Positions are calculated using Principal Component Analysis (PCA)
+              Positions are calculated using{" "}
+              <a
+                href="https://en.wikipedia.org/wiki/Principal_component_analysis"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-red-700 hover:underline"
+              >
+                Principal Component Analysis (PCA)
+              </a>{" "}
               on the member-vote matrix. Each member&apos;s votes on Principles
               and Third Reading divisions are encoded as +1 (Pour) or -1
               (Contre). PCA finds the directions of greatest variation in this

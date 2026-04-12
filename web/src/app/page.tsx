@@ -29,7 +29,7 @@ export default async function Home() {
     <div>
       {/* Hero */}
       <section className="bg-gradient-to-br from-red-800 to-red-950 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl font-bold mb-4">
             How does your Assembly vote?
           </h1>
@@ -57,7 +57,7 @@ export default async function Home() {
 
       {/* Stats bar */}
       <section className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <StatCard
               label="Active Members"
@@ -77,7 +77,7 @@ export default async function Home() {
       </section>
 
       {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Recent key votes */}
           <div className="lg:col-span-2">

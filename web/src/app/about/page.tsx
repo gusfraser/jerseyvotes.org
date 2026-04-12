@@ -1,6 +1,6 @@
 export default function AboutPage() {
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <h1 className="text-3xl font-bold mb-8">About Jersey Votes</h1>
 
       <div className="bg-white rounded-lg border border-gray-200 p-8 space-y-6 text-gray-700 leading-relaxed">
@@ -119,7 +119,7 @@ export default function AboutPage() {
             Built by
           </h2>
           <p>
-            Jersey Votes was created by Gus Fraser, a Jersey resident who believes
+            Jersey Votes was created by <a href="https://www.linkedin.com/in/aonghusfraser/" target="_blank" rel="noopener noreferrer" className="text-red-700 hover:underline font-medium">Gus Fraser</a>, a Jersey resident who believes
             that transparent, accessible political data is essential for a
             healthy democracy.
           </p>

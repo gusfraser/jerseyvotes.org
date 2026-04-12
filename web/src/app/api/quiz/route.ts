@@ -49,11 +49,22 @@ export async function GET() {
     if (selected.length >= 30) break;
   }
 
-  const questions = selected.map((q) => ({
+  const questions = selected.map((q) => {
+    // If no one-liner but has extended summary, extract first sentence as summary
+    let summary = q.plain_language_summary as string | null;
+    const extended = q.extended_summary as string | null;
+    if (!summary && extended) {
+      // Get the first non-heading paragraph content
+      const lines = extended.split("\n").filter((l: string) => l.trim() && !l.startsWith("**"));
+      if (lines.length > 0) {
+        summary = lines[0].trim();
+      }
+    }
+    return {
     divisionId: q.division_id,
     title: q.proposition_title,
-    summary: q.plain_language_summary || null,
-    extendedSummary: q.extended_summary || null,
+    summary,
+    extendedSummary: extended,
     topic: q.topic_primary,
     reference: q.base_reference,
     sourceUrl: q.source_url,
@@ -61,7 +72,8 @@ export async function GET() {
     pourCount: q.pour_count,
     contreCount: q.contre_count,
     passed: (q.pour_count as number) > (q.contre_count as number),
-  }));
+  };
+  });
 
   return NextResponse.json({ questions });
 }

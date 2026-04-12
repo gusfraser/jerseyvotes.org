@@ -57,8 +57,9 @@ export function AlignmentHeatmap() {
   const n = names.length;
   const cellSize = 16;
   const labelWidth = 160;
-  const svgWidth = labelWidth + n * cellSize;
-  const svgHeight = labelWidth + n * cellSize;
+  const topPadding = 40; // extra space for rotated column labels
+  const svgWidth = labelWidth + n * cellSize + 10;
+  const svgHeight = labelWidth + topPadding + n * cellSize;
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto">
@@ -72,7 +73,7 @@ export function AlignmentHeatmap() {
           <text
             key={`row-${i}`}
             x={labelWidth - 4}
-            y={labelWidth + i * cellSize + cellSize / 2 + 4}
+            y={labelWidth + topPadding + i * cellSize + cellSize / 2 + 4}
             textAnchor="end"
             fontSize={9}
             fill="#666"
@@ -90,7 +91,7 @@ export function AlignmentHeatmap() {
             textAnchor="start"
             fontSize={9}
             fill="#666"
-            transform={`translate(${labelWidth + j * cellSize + cellSize / 2 + 3}, ${labelWidth - 4}) rotate(-60)`}
+            transform={`translate(${labelWidth + j * cellSize + cellSize / 2 + 3}, ${labelWidth + topPadding - 4}) rotate(-60)`}
           >
             {name}
           </text>
@@ -104,7 +105,7 @@ export function AlignmentHeatmap() {
               <rect
                 key={`${i}-${j}`}
                 x={labelWidth + j * cellSize}
-                y={labelWidth + i * cellSize}
+                y={labelWidth + topPadding + i * cellSize}
                 width={cellSize}
                 height={cellSize}
                 fill={getColor(value)}
@@ -147,14 +148,22 @@ export function AlignmentHeatmap() {
       </svg>
 
       {/* Tooltip */}
-      {tooltip && (
-        <div
-          className="absolute bg-gray-900 text-white text-xs px-3 py-2 rounded shadow-lg pointer-events-none z-50 whitespace-nowrap"
-          style={{ left: tooltip.x + 10, top: tooltip.y - 30 }}
-        >
-          {tooltip.text}
-        </div>
-      )}
+      {tooltip && (() => {
+        const containerWidth = containerRef.current?.offsetWidth || 800;
+        const flippedX = tooltip.x > containerWidth - 300;
+        return (
+          <div
+            className="absolute bg-gray-900 text-white text-xs px-3 py-2 rounded shadow-lg pointer-events-none z-50 whitespace-nowrap"
+            style={{
+              left: flippedX ? undefined : tooltip.x + 10,
+              right: flippedX ? (containerWidth - tooltip.x + 10) : undefined,
+              top: tooltip.y - 30,
+            }}
+          >
+            {tooltip.text}
+          </div>
+        );
+      })()}
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-6 text-sm text-gray-500">

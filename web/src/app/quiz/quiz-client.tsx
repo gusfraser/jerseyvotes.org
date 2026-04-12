@@ -554,44 +554,113 @@ function QuizResultReveal({
   );
 }
 
+function RenderMarkdown({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => {
+        if (!line.trim()) return null;
+        const parts = line.split(/\*\*(.*?)\*\*/g);
+        return (
+          <p key={i} className="mb-2 last:mb-0">
+            {parts.map((part, j) =>
+              j % 2 === 1 ? (
+                <strong key={j}>{part}</strong>
+              ) : (
+                <span key={j}>{part}</span>
+              )
+            )}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
 function ExpandableSummary({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+
+  // Split into sections by bold headings like **What it proposed**, **Why...**, **Key arguments**
+  const sections: { title: string; body: string }[] = [];
+  const lines = text.split("\n").filter((l) => l.trim());
+
+  let currentTitle = "";
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^\*\*(.+?)\*\*\s*(.*)/);
+    if (headingMatch) {
+      if (currentTitle || currentBody.length > 0) {
+        sections.push({ title: currentTitle, body: currentBody.join("\n") });
+      }
+      currentTitle = headingMatch[1];
+      currentBody = headingMatch[2] ? [headingMatch[2]] : [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  if (currentTitle || currentBody.length > 0) {
+    sections.push({ title: currentTitle, body: currentBody.join("\n") });
+  }
+
+  // If we couldn't parse sections, fall back to showing all text
+  if (sections.length === 0) {
+    return (
+      <div className="mb-4 p-4 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed">
+        <RenderMarkdown text={text} />
+      </div>
+    );
+  }
+
+  const firstSection = sections[0];
+  const restSections = sections.slice(1);
 
   return (
-    <div className="mb-4">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="text-sm text-red-700 hover:text-red-900 font-medium transition-colors flex items-center gap-1"
-      >
-        {expanded ? "Hide details" : "Read more about this proposition"}
-        <svg
-          className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {expanded && (
-        <div className="mt-3 p-4 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
-          {text.split("\n").map((paragraph, i) => {
-            if (!paragraph.trim()) return null;
-            // Handle markdown bold
-            const parts = paragraph.split(/\*\*(.*?)\*\*/g);
-            return (
-              <p key={i} className="mb-2 last:mb-0">
-                {parts.map((part, j) =>
-                  j % 2 === 1 ? (
-                    <strong key={j}>{part}</strong>
-                  ) : (
-                    <span key={j}>{part}</span>
-                  )
-                )}
-              </p>
-            );
-          })}
-        </div>
+    <div className="mb-4 space-y-2">
+      {/* First section always visible */}
+      <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed">
+        {firstSection.title && (
+          <p className="font-semibold text-gray-900 mb-1">{firstSection.title}</p>
+        )}
+        <RenderMarkdown text={firstSection.body} />
+      </div>
+
+      {/* More sections expandable */}
+      {restSections.length > 0 && (
+        <>
+          {!showMore ? (
+            <button
+              onClick={() => setShowMore(true)}
+              className="flex items-center gap-2 text-sm text-red-700 hover:text-red-900 font-medium transition-colors px-4 py-2 bg-gray-50 rounded-lg w-full hover:bg-gray-100"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              Why was this brought forward? Key arguments...
+            </button>
+          ) : (
+            <>
+              {restSections.map((section, i) => (
+                <div
+                  key={i}
+                  className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed"
+                >
+                  {section.title && (
+                    <p className="font-semibold text-gray-900 mb-1">
+                      {section.title}
+                    </p>
+                  )}
+                  <RenderMarkdown text={section.body} />
+                </div>
+              ))}
+              <button
+                onClick={() => setShowMore(false)}
+                className="text-xs text-gray-400 hover:text-gray-600 px-4"
+              >
+                Show less
+              </button>
+            </>
+          )}
+        </>
       )}
     </div>
   );

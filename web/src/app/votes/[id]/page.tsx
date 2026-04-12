@@ -40,7 +40,7 @@ export default async function VotePage({
     (division.pour_count as number) > (division.contre_count as number);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Link
         href="/votes"
         className="text-sm text-gray-500 hover:text-red-700 mb-4 inline-block"

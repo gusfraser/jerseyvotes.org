@@ -235,39 +235,50 @@ export function BlocsChart() {
                   className="pointer-events-none transition-all duration-150"
                 />
                 {/* Label - always visible, highlighted on hover */}
-                {isHovered ? (
-                  <>
-                    <rect
-                      x={cx + 10}
-                      y={cy - 10}
-                      width={m.name.length * 7 + 8}
-                      height={20}
-                      rx={4}
-                      fill="rgba(0,0,0,0.85)"
-                      className="pointer-events-none"
-                    />
+                {isHovered ? (() => {
+                  const labelWidth = m.name.length * 7 + 8;
+                  const flipLeft = cx > width - labelWidth - 20;
+                  const rectX = flipLeft ? cx - labelWidth - 10 : cx + 10;
+                  const textX = flipLeft ? cx - labelWidth - 6 : cx + 14;
+                  return (
+                    <>
+                      <rect
+                        x={rectX}
+                        y={cy - 10}
+                        width={labelWidth}
+                        height={20}
+                        rx={4}
+                        fill="rgba(0,0,0,0.85)"
+                        className="pointer-events-none"
+                      />
+                      <text
+                        x={textX}
+                        y={cy + 4}
+                        fontSize={12}
+                        fill="white"
+                        fontWeight="bold"
+                        className="pointer-events-none"
+                      >
+                        {m.name}
+                      </text>
+                    </>
+                  );
+                })() : (() => {
+                  const surname = m.name.split(" ").slice(-1)[0];
+                  const flipLeft = cx > width - surname.length * 5 - 20;
+                  return (
                     <text
-                      x={cx + 14}
-                      y={cy + 4}
-                      fontSize={12}
-                      fill="white"
-                      fontWeight="bold"
+                      x={flipLeft ? cx - 9 : cx + 9}
+                      y={cy + 3}
+                      fontSize={8}
+                      textAnchor={flipLeft ? "end" : "start"}
+                      fill={hovered ? "#bbb" : "#555"}
                       className="pointer-events-none"
                     >
-                      {m.name}
+                      {surname}
                     </text>
-                  </>
-                ) : (
-                  <text
-                    x={cx + 9}
-                    y={cy + 3}
-                    fontSize={8}
-                    fill={hovered ? "#bbb" : "#555"}
-                    className="pointer-events-none"
-                  >
-                    {m.name.split(" ").slice(-1)[0]}
-                  </text>
-                )}
+                  );
+                })()}
               </a>
             </g>
           );

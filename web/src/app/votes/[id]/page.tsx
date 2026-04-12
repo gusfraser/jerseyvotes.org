@@ -1,7 +1,38 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slugify";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const divisionId = parseInt(id, 10);
+  if (isNaN(divisionId)) return {};
+  const rows = await sql`
+    SELECT vd.proposition_title, vd.pour_count, vd.contre_count, vd.date,
+           p.plain_language_summary
+    FROM vote_divisions vd
+    JOIN propositions p ON vd.proposition_id = p.proposition_id
+    WHERE vd.division_id = ${divisionId}
+  `;
+  if (rows.length === 0) return {};
+  const d = rows[0];
+  const title = d.proposition_title as string;
+  const passed = (d.pour_count as number) > (d.contre_count as number);
+  const result = passed ? "Adopted" : "Rejected";
+  const description =
+    (d.plain_language_summary as string) ||
+    `${result} ${d.pour_count}–${d.contre_count} on ${new Date(d.date as string).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, url: `https://jerseyvotes.org/votes/${id}` },
+  };
+}
 
 export default async function VotePage({
   params,

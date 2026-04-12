@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slugify";
+
+export const metadata: Metadata = {
+  title: "Members",
+  description:
+    "Browse voting records for all 158 Jersey States Assembly members from 2004 to present, including 49 currently active members.",
+};
 
 export default async function MembersPage() {
   const members = await sql`

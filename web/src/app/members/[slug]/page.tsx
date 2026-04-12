@@ -1,7 +1,29 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slugify";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const members = await sql`SELECT canonical_name, display_name, position_history FROM members`;
+  const member = members.find(
+    (m: Record<string, unknown>) => slugify(m.canonical_name as string) === slug
+  );
+  if (!member) return {};
+  const positions = member.position_history as { position: string }[];
+  const position = positions?.[0]?.position ?? "Member";
+  const name = member.display_name as string;
+  return {
+    title: name,
+    description: `${name} — ${position} of the Jersey States Assembly. View their full voting record, participation rate, and topic breakdown.`,
+    openGraph: { title: name, url: `https://jerseyvotes.org/members/${slug}` },
+  };
+}
 
 export default async function MemberPage({
   params,

@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { QuizClient } from "./quiz-client";
+
+export const metadata: Metadata = {
+  title: "Voter Quiz",
+  description:
+    "Find out which Jersey States Assembly members most closely align with your views. Answer questions on real divisive votes, get matched to your representatives.",
+};
 
 export default function QuizPage() {
   return (

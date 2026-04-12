@@ -13,10 +13,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteDescription =
+  "Explore 22 years of Jersey States Assembly voting data. Analyse politician voting patterns, find aligned representatives, and understand how your Assembly votes.";
+
 export const metadata: Metadata = {
-  title: "Jersey Votes",
-  description:
-    "Explore 22 years of Jersey States Assembly voting data. Analyse politician voting patterns, find aligned representatives, and understand how your Assembly votes.",
+  metadataBase: new URL("https://jerseyvotes.org"),
+  title: {
+    template: "%s | Jersey Votes",
+    default: "Jersey Votes",
+  },
+  description: siteDescription,
+  openGraph: {
+    siteName: "Jersey Votes",
+    locale: "en_GB",
+    type: "website",
+    url: "https://jerseyvotes.org",
+    title: "Jersey Votes",
+    description: siteDescription,
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@jerseyvotes",
+    title: "Jersey Votes",
+    description: siteDescription,
+    images: ["/opengraph-image"],
+  },
 };
 
 export default function RootLayout({

@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
+
+export const metadata: Metadata = {
+  title: "Votes",
+  description:
+    "Browse all 5,400+ Jersey States Assembly vote divisions from 2004 to present. Filter by topic, stage, and outcome.",
+};
 
 export default async function VotesPage({
   searchParams,

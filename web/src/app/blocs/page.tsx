@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { BlocsChart } from "./chart";
+
+export const metadata: Metadata = {
+  title: "Voting Blocs",
+  description:
+    "Discover informal voting coalitions in the Jersey States Assembly. Members positioned by how they actually vote — not by party or label.",
+};
 
 export default function BlocsPage() {
   return (

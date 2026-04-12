@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { AlignmentHeatmap } from "./heatmap";
+
+export const metadata: Metadata = {
+  title: "Alignment Matrix",
+  description:
+    "See how often each pair of Jersey States Assembly members vote the same way. An interactive heatmap of pairwise voting agreement across the current term.",
+};
 
 export default function AlignmentPage() {
   return (

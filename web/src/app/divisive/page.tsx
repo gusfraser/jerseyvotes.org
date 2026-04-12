@@ -27,16 +27,24 @@ export default async function DivisivePage() {
       ORDER BY avg_closeness DESC
     `,
     sql`
-      SELECT vd.division_id, vd.proposition_title, vd.date,
-             vd.pour_count, vd.contre_count, vd.division_stage,
-             p.base_reference, p.topic_primary, p.plain_language_summary,
-             LEAST(vd.pour_count, vd.contre_count)::float
-               / NULLIF(vd.pour_count + vd.contre_count, 0) as closeness
-      FROM vote_divisions vd
-      JOIN propositions p ON vd.proposition_id = p.proposition_id
-      WHERE vd.division_stage IN ('principles', 'third_reading', 'amendment')
-        AND (vd.pour_count + vd.contre_count) >= 20
-        AND vd.date >= '2022-07-01'
+      SELECT division_id, proposition_title, date,
+             pour_count, contre_count, division_stage,
+             base_reference, topic_primary, plain_language_summary,
+             closeness
+      FROM (
+        SELECT DISTINCT ON (vd.proposition_id)
+          vd.division_id, vd.proposition_title, vd.date,
+          vd.pour_count, vd.contre_count, vd.division_stage,
+          p.base_reference, p.topic_primary, p.plain_language_summary,
+          LEAST(vd.pour_count, vd.contre_count)::float
+            / NULLIF(vd.pour_count + vd.contre_count, 0) as closeness
+        FROM vote_divisions vd
+        JOIN propositions p ON vd.proposition_id = p.proposition_id
+        WHERE vd.division_stage IN ('principles', 'third_reading', 'amendment')
+          AND (vd.pour_count + vd.contre_count) >= 20
+          AND vd.date >= '2022-07-01'
+        ORDER BY vd.proposition_id, closeness DESC
+      ) deduped
       ORDER BY closeness DESC
       LIMIT 25
     `,

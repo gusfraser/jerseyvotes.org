@@ -58,10 +58,11 @@ export function AlignmentHeatmap() {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const cellSize = isMobile ? 10 : 16;
   const labelWidth = isMobile ? 100 : 160;
+  const topLabelHeight = isMobile ? 70 : 100;
   const labelFontSize = isMobile ? 6 : 9;
   const topPadding = isMobile ? 25 : 40;
   const svgWidth = labelWidth + n * cellSize + 80;
-  const svgHeight = labelWidth + topPadding + n * cellSize;
+  const svgHeight = topLabelHeight + topPadding + n * cellSize;
 
   return (
     <div ref={containerRef} className="relative overflow-x-auto">
@@ -75,7 +76,7 @@ export function AlignmentHeatmap() {
           <text
             key={`row-${i}`}
             x={labelWidth - 4}
-            y={labelWidth + topPadding + i * cellSize + cellSize / 2 + 4}
+            y={topLabelHeight + topPadding + i * cellSize + cellSize / 2 + 4}
             textAnchor="end"
             fontSize={labelFontSize}
             fill="#666"
@@ -93,7 +94,7 @@ export function AlignmentHeatmap() {
             textAnchor="start"
             fontSize={labelFontSize}
             fill="#666"
-            transform={`translate(${labelWidth + j * cellSize + cellSize / 2 + 3}, ${labelWidth + topPadding - 4}) rotate(-60)`}
+            transform={`translate(${labelWidth + j * cellSize + cellSize / 2 + 3}, ${topLabelHeight + topPadding - 4}) rotate(-60)`}
           >
             {name}
           </text>
@@ -107,7 +108,7 @@ export function AlignmentHeatmap() {
               <rect
                 key={`${i}-${j}`}
                 x={labelWidth + j * cellSize}
-                y={labelWidth + topPadding + i * cellSize}
+                y={topLabelHeight + topPadding + i * cellSize}
                 width={cellSize}
                 height={cellSize}
                 fill={getColor(value)}
@@ -139,7 +140,7 @@ export function AlignmentHeatmap() {
           <rect
             key={`diag-${i}`}
             x={labelWidth + i * cellSize}
-            y={labelWidth + topPadding + i * cellSize}
+            y={topLabelHeight + topPadding + i * cellSize}
             width={cellSize}
             height={cellSize}
             fill="#e5e7eb"

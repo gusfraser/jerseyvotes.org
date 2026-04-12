@@ -45,7 +45,7 @@ export default async function VotePage({
 
   const [divisions, votes] = await Promise.all([
     sql`SELECT vd.*, p.base_reference, p.source_url, p.topic_primary,
-             p.plain_language_summary, p.topic_tags
+             p.plain_language_summary, p.extended_summary, p.topic_tags
            FROM vote_divisions vd
            JOIN propositions p ON vd.proposition_id = p.proposition_id
            WHERE vd.division_id = ${divisionId}`,
@@ -88,6 +88,9 @@ export default async function VotePage({
           <p className="text-lg text-gray-600 mb-3">
             {division.plain_language_summary as string}
           </p>
+        )}
+        {Boolean(division.extended_summary) && (
+          <ExtendedSummary text={division.extended_summary as string} />
         )}
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500">
           <span>{division.reference as string}</span>
@@ -188,6 +191,43 @@ export default async function VotePage({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+function ExtendedSummary({ text }: { text: string }) {
+  // Parse sections like **What it proposed** ... **Why** ... **Key arguments**
+  const sections: { title: string; body: string }[] = [];
+  const lines = text.split("\n").filter((l) => l.trim());
+  let currentTitle = "";
+  let currentBody: string[] = [];
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^\*\*(.+?)\*\*\s*(.*)/);
+    if (headingMatch) {
+      if (currentTitle || currentBody.length > 0) {
+        sections.push({ title: currentTitle, body: currentBody.join(" ") });
+      }
+      currentTitle = headingMatch[1];
+      currentBody = headingMatch[2] ? [headingMatch[2]] : [];
+    } else {
+      currentBody.push(line);
+    }
+  }
+  if (currentTitle || currentBody.length > 0) {
+    sections.push({ title: currentTitle, body: currentBody.join(" ") });
+  }
+
+  if (sections.length === 0) return null;
+
+  return (
+    <div className="mb-4 space-y-3">
+      {sections.map((s, i) => (
+        <div key={i} className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
+          {s.title && <p className="font-semibold text-gray-900 mb-1">{s.title}</p>}
+          <p>{s.body}</p>
+        </div>
+      ))}
     </div>
   );
 }

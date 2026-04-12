@@ -121,7 +121,7 @@ export default async function DivisivePage() {
                         ? (v.plain_language_summary as string)
                         : (v.proposition_title as string)}
                     </p>
-                    {v.plain_language_summary && (
+                    {Boolean(v.plain_language_summary) && (
                       <p className="text-xs text-gray-400 mt-0.5 truncate">
                         {v.proposition_title as string}
                       </p>
@@ -134,7 +134,7 @@ export default async function DivisivePage() {
                           { day: "numeric", month: "short", year: "numeric" }
                         )}
                       </span>
-                      {v.topic_primary && (
+                      {Boolean(v.topic_primary) && (
                         <span className="bg-gray-100 px-2 py-0.5 rounded">
                           {v.topic_primary as string}
                         </span>

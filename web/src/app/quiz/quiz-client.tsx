@@ -40,6 +40,12 @@ function slugify(name: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+function trackEvent(name: string, params?: Record<string, string | number | boolean>) {
+  if (typeof window !== "undefined" && typeof (window as unknown as { gtag?: unknown }).gtag === "function") {
+    (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", name, params ?? {});
+  }
+}
+
 const STORAGE_KEY = "jerseyvotes-quiz";
 
 function loadSavedState() {
@@ -86,7 +92,11 @@ export function QuizClient() {
           // Only resume if saved less than 7 days ago
           if (Date.now() - saved.savedAt < 7 * 24 * 60 * 60 * 1000) {
             setShowResume(true);
+          } else {
+            trackEvent("quiz_started");
           }
+        } else {
+          trackEvent("quiz_started");
         }
 
         setLoading(false);
@@ -99,6 +109,7 @@ export function QuizClient() {
       setCurrentIdx(saved.currentIdx || 0);
       setAnswers(saved.answers || []);
       setSkipped(new Set(saved.skipped || []));
+      trackEvent("quiz_resumed", { answers_saved: saved.answers?.length ?? 0 });
     }
     setShowResume(false);
   }
@@ -106,6 +117,7 @@ export function QuizClient() {
   function dismissResume() {
     clearSavedState();
     setShowResume(false);
+    trackEvent("quiz_started");
   }
 
   // Save progress whenever answers or position change
@@ -117,6 +129,11 @@ export function QuizClient() {
 
   function handleVote(vote: "pour" | "contre") {
     const q = questions[currentIdx];
+    trackEvent("quiz_question_answered", {
+      question_number: currentIdx + 1,
+      vote,
+      topic: q.topic,
+    });
     // Remove any existing answer for this question (in case of going back)
     const filtered = answers.filter((a) => a.divisionId !== q.divisionId);
     setAnswers([...filtered, { divisionId: q.divisionId, vote }]);
@@ -129,6 +146,10 @@ export function QuizClient() {
 
   function handleSkip() {
     const q = questions[currentIdx];
+    trackEvent("quiz_question_skipped", {
+      question_number: currentIdx + 1,
+      topic: q.topic,
+    });
     // Remove any existing answer for this question
     setAnswers(answers.filter((a) => a.divisionId !== q.divisionId));
     setSkipped(new Set([...skipped, q.divisionId]));
@@ -150,6 +171,7 @@ export function QuizClient() {
   }
 
   function resetQuiz() {
+    trackEvent("quiz_reset", { questions_answered: answers.length });
     setCurrentIdx(0);
     setAnswers([]);
     setSkipped(new Set());
@@ -174,6 +196,15 @@ export function QuizClient() {
           setResults(d.results);
           setLoading(false);
           clearSavedState();
+          if (d.results?.length > 0) {
+            trackEvent("quiz_completed", {
+              questions_answered: answers.length,
+              questions_skipped: skipped.size,
+              top_match: d.results[0].displayName,
+              top_match_pct: Math.round(d.results[0].agreementPct * 100),
+              early: false,
+            });
+          }
         });
     }, 100);
   }
@@ -190,6 +221,15 @@ export function QuizClient() {
       .then((d) => {
         setResults(d.results);
         setLoading(false);
+        if (d.results?.length > 0) {
+          trackEvent("quiz_completed", {
+            questions_answered: answers.length,
+            questions_skipped: skipped.size,
+            top_match: d.results[0].displayName,
+            top_match_pct: Math.round(d.results[0].agreementPct * 100),
+            early: true,
+          });
+        }
       });
   }
 
@@ -232,7 +272,7 @@ export function QuizClient() {
 
   // Show results
   if (results) {
-    return <QuizResults results={results} answerCount={answers.length} onReset={resetQuiz} />;
+    return <QuizResults results={results} answerCount={answers.length} onReset={resetQuiz} onMemberClick={(name, rank) => trackEvent("quiz_member_clicked", { member: name, rank })} />;
   }
 
   // Show question
@@ -394,10 +434,12 @@ function QuizResults({
   results,
   answerCount,
   onReset,
+  onMemberClick,
 }: {
   results: MatchResult[];
   answerCount: number;
   onReset: () => void;
+  onMemberClick: (name: string, rank: number) => void;
 }) {
   if (results.length === 0) {
     return (
@@ -427,6 +469,7 @@ function QuizResults({
         <Link
           href={`/members/${slugify(top.name)}`}
           className="text-3xl font-bold text-red-700 hover:underline"
+          onClick={() => onMemberClick(top.displayName, 1)}
         >
           {top.displayName}
         </Link>
@@ -456,6 +499,7 @@ function QuizResults({
             key={m.name}
             href={`/members/${slugify(m.name)}`}
             className="flex items-center gap-4 bg-white rounded-lg border border-gray-200 p-3 hover:border-red-300 transition-colors"
+            onClick={() => onMemberClick(m.displayName, i + 1)}
           >
             <span className="w-8 text-center text-sm font-bold text-gray-400">
               {i + 1}
@@ -546,7 +590,7 @@ function QuizResultReveal({
 
   return (
     <button
-      onClick={() => setRevealed(true)}
+      onClick={() => { setRevealed(true); trackEvent("quiz_result_revealed", { division_id: divisionId }); }}
       className="text-gray-400 hover:text-gray-600 transition-colors"
     >
       Reveal how the Assembly voted
@@ -688,6 +732,7 @@ function ShareButton({
     : "";
 
   async function handleShare() {
+    trackEvent("quiz_result_shared", { top_match: name, top_match_pct: pct });
     if (navigator.share) {
       try {
         await navigator.share({ title: "Jersey Votes - My Quiz Result", text: shareText, url: shareUrl });

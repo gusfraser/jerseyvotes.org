@@ -7,6 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: "https://jerseyvotes.org", priority: 1.0, changeFrequency: "daily" },
     { url: "https://jerseyvotes.org/members", priority: 0.9, changeFrequency: "weekly" },
     { url: "https://jerseyvotes.org/votes", priority: 0.9, changeFrequency: "daily" },
+    { url: "https://jerseyvotes.org/divisive", priority: 0.8, changeFrequency: "weekly" },
     { url: "https://jerseyvotes.org/alignment", priority: 0.7, changeFrequency: "weekly" },
     { url: "https://jerseyvotes.org/blocs", priority: 0.7, changeFrequency: "weekly" },
     { url: "https://jerseyvotes.org/quiz", priority: 0.8, changeFrequency: "weekly" },

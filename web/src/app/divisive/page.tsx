@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql } from "@/lib/db";
+import { PolarizationChart } from "./polarization-chart";
 
 export const metadata: Metadata = {
   title: "Most Divisive",
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function DivisivePage() {
-  const [topicRows, closeVotes] = await Promise.all([
+  const [topicRows, closeVotes, polarizationRows] = await Promise.all([
     sql`
       SELECT p.topic_primary,
              COUNT(*) as vote_count,
@@ -39,7 +40,24 @@ export default async function DivisivePage() {
       ORDER BY closeness DESC
       LIMIT 25
     `,
+    sql`
+      SELECT EXTRACT(YEAR FROM vd.date)::int as year,
+             COUNT(*) as vote_count,
+             AVG(LEAST(vd.pour_count, vd.contre_count)::float
+                 / NULLIF(vd.pour_count + vd.contre_count, 0)) as avg_closeness
+      FROM vote_divisions vd
+      WHERE vd.division_stage IN ('principles', 'third_reading', 'amendment')
+        AND (vd.pour_count + vd.contre_count) >= 10
+      GROUP BY EXTRACT(YEAR FROM vd.date)
+      ORDER BY year
+    `,
   ]);
+
+  const polarizationData = polarizationRows.map((r: Record<string, unknown>) => ({
+    year: Number(r.year),
+    avgCloseness: Number(r.avg_closeness),
+    voteCount: Number(r.vote_count),
+  }));
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -92,6 +110,17 @@ export default async function DivisivePage() {
         <p className="text-xs text-gray-400 mt-4">
           Red = highly contested (close to 50-50 splits). Only topics with 3+ votes shown.
         </p>
+      </section>
+
+      {/* Polarization Over Time */}
+      <section className="mb-14">
+        <h2 className="text-xl font-bold mb-1">Polarization Over Time</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          How divided has the Assembly been across 22 years? Higher values mean
+          votes were more evenly split on average. Red dashed lines mark election
+          years.
+        </p>
+        <PolarizationChart data={polarizationData} />
       </section>
 
       {/* Closest Votes */}

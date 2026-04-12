@@ -12,7 +12,7 @@ import psycopg2
 DATABASE_URL = os.environ.get('DATABASE_URL',
     '***REDACTED***')
 
-MODEL = 'mistral-nemo:latest'
+MODEL = 'gemma4:e4b'
 
 SYSTEM = """You are a civic information assistant for Jersey (Channel Island). Your job is to explain States Assembly propositions in plain language so that ordinary voters can understand what was being voted on and why it matters.
 
@@ -32,7 +32,7 @@ def call_ollama(prompt: str) -> str:
         data=data,
         headers={'Content-Type': 'application/json'}
     )
-    resp = urllib.request.urlopen(req, timeout=300)
+    resp = urllib.request.urlopen(req, timeout=600)
     return json.loads(resp.read())['response'].strip()
 
 
@@ -40,19 +40,16 @@ def main():
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    # Get quiz-eligible propositions: divisive votes in the current term
+    # Get all current-term propositions that need extended summaries
     cur.execute("""
         SELECT p.proposition_id, p.base_reference, p.title, p.scraped_text
         FROM propositions p
         WHERE p.extended_summary IS NULL
+          AND p.scraped_text IS NOT NULL
           AND p.proposition_id IN (
             SELECT DISTINCT vd.proposition_id
             FROM vote_divisions vd
-            WHERE vd.division_stage IN ('principles', 'third_reading', 'amendment')
-              AND vd.date >= '2022-07-01'
-              AND (vd.pour_count + vd.contre_count) >= 20
-              AND LEAST(vd.pour_count, vd.contre_count)::float
-                  / NULLIF(vd.pour_count + vd.contre_count, 0) >= 0.25
+            WHERE vd.date >= '2022-07-01'
           )
         ORDER BY p.year DESC, p.number DESC
     """)

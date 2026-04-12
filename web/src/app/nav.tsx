@@ -43,7 +43,11 @@ export function Nav() {
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-bold text-red-700">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-red-700">
+            <svg viewBox="0 0 32 32" className="w-7 h-7">
+              <rect width="32" height="32" rx="6" fill="#991b1b"/>
+              <path d="M9 16.5l4.5 4.5L23 11" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
             Jersey Votes
           </Link>
 

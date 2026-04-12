@@ -53,7 +53,7 @@ export default async function VotePage({
         <h1 className="text-2xl font-bold mb-2">
           {division.proposition_title as string}
         </h1>
-        {division.plain_language_summary && (
+        {Boolean(division.plain_language_summary) && (
           <p className="text-lg text-gray-600 mb-3">
             {division.plain_language_summary as string}
           </p>
@@ -71,12 +71,12 @@ export default async function VotePage({
           <span className="capitalize bg-gray-100 px-2 py-0.5 rounded">
             {(division.division_stage as string).replace("_", " ")}
           </span>
-          {division.topic_primary && (
+          {Boolean(division.topic_primary) && (
             <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded">
               {division.topic_primary as string}
             </span>
           )}
-          {division.source_url && (
+          {Boolean(division.source_url) && (
             <a
               href={division.source_url as string}
               target="_blank"

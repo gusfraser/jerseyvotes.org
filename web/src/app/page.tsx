@@ -105,7 +105,7 @@ export default async function Home() {
                             year: "numeric",
                           })}
                         </span>
-                        {vote.topic_primary && (
+                        {Boolean(vote.topic_primary) && (
                           <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">
                             {vote.topic_primary as string}
                           </span>

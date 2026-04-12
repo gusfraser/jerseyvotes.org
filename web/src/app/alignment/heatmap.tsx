@@ -55,9 +55,11 @@ export function AlignmentHeatmap() {
 
   const { names, matrix, sharedCounts } = data;
   const n = names.length;
-  const cellSize = 16;
-  const labelWidth = 160;
-  const topPadding = 40; // extra space for rotated column labels
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const cellSize = isMobile ? 10 : 16;
+  const labelWidth = isMobile ? 100 : 160;
+  const labelFontSize = isMobile ? 6 : 9;
+  const topPadding = isMobile ? 25 : 40;
   const svgWidth = labelWidth + n * cellSize + 10;
   const svgHeight = labelWidth + topPadding + n * cellSize;
 
@@ -75,7 +77,7 @@ export function AlignmentHeatmap() {
             x={labelWidth - 4}
             y={labelWidth + topPadding + i * cellSize + cellSize / 2 + 4}
             textAnchor="end"
-            fontSize={9}
+            fontSize={labelFontSize}
             fill="#666"
           >
             {name}
@@ -89,7 +91,7 @@ export function AlignmentHeatmap() {
             x={0}
             y={0}
             textAnchor="start"
-            fontSize={9}
+            fontSize={labelFontSize}
             fill="#666"
             transform={`translate(${labelWidth + j * cellSize + cellSize / 2 + 3}, ${labelWidth + topPadding - 4}) rotate(-60)`}
           >
@@ -137,7 +139,7 @@ export function AlignmentHeatmap() {
           <rect
             key={`diag-${i}`}
             x={labelWidth + i * cellSize}
-            y={labelWidth + i * cellSize}
+            y={labelWidth + topPadding + i * cellSize}
             width={cellSize}
             height={cellSize}
             fill="#e5e7eb"

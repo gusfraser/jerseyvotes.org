@@ -218,7 +218,7 @@ export default async function VotesPage({
                   <span className="capitalize">
                     {(v.division_stage as string).replace("_", " ")}
                   </span>
-                  {v.topic_primary && (
+                  {Boolean(v.topic_primary) && (
                     <span className="bg-gray-100 px-1.5 py-0.5 rounded">
                       {v.topic_primary as string}
                     </span>

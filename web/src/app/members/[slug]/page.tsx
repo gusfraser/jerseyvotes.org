@@ -94,7 +94,7 @@ export default async function MemberPage({
             )}
           </p>
         </div>
-        {member.is_currently_active && (
+        {Boolean(member.is_currently_active) && (
           <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
             Currently Active
           </span>

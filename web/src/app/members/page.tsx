@@ -69,7 +69,7 @@ function MemberCard({ member: m }: { member: Record<string, unknown> }) {
           </p>
           <p className="text-sm text-gray-500">{mainPosition}</p>
         </div>
-        {m.is_currently_active && (
+        {Boolean(m.is_currently_active) && (
           <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">
             Active
           </span>

@@ -76,25 +76,48 @@ export default function BlocsPage() {
             </p>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
-            <p className="font-semibold text-gray-900 mb-1">Methodology</p>
-            <p>
-              Positions are calculated using{" "}
-              <a
-                href="https://en.wikipedia.org/wiki/Principal_component_analysis"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-red-700 hover:underline"
-              >
-                Principal Component Analysis (PCA)
-              </a>{" "}
-              on the member-vote matrix. Each member&apos;s votes on Principles
-              and Third Reading divisions are encoded as +1 (Pour) or -1
-              (Contre). PCA finds the directions of greatest variation in this
-              data. Blocs are identified using k-means clustering on the
-              resulting coordinates. Only the current term (July 2022 onwards)
-              is included.
-            </p>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-3">
+            <p className="font-semibold text-gray-900">Methodology &amp; assumptions</p>
+
+            <div>
+              <p className="font-medium text-gray-800 mb-1">Which votes are included</p>
+              <p className="text-gray-700">
+                Only <strong>Principles</strong> and <strong>Third Reading</strong>{" "}divisions from the current term (July 2022&ndash;present) are used. These are the votes that best represent a member&rsquo;s genuine policy stance &mdash; they are the key decisions on whether a proposition should proceed and what its final form should be.
+              </p>
+              <p className="text-gray-700 mt-1">
+                <strong>Excluded:</strong> Amendment votes, procedural motions, paragraph-by-paragraph votes, and Articles votes. These are excluded because they often reflect tactical or procedural considerations rather than overall policy position, and including them adds noise.
+              </p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-800 mb-1">How absences are handled</p>
+              <p className="text-gray-700">
+                Only <strong>Pour</strong> and <strong>Contre</strong>{" "}votes are used in the analysis. If a member was absent, excused, or abstained on a vote, that division is simply not counted for them &mdash; it doesn&rsquo;t push them toward any position. Members with fewer votes will have less reliable positions on the chart.
+              </p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-800 mb-1">The 5-bloc grouping</p>
+              <p className="text-gray-700">
+                The number of blocs (5) is fixed. The algorithm finds the best 5-group split of the data &mdash; it does not determine how many groups there &ldquo;should&rdquo; be. The data may naturally contain fewer or more clusters; 5 was chosen as a reasonable starting point for a chamber of 49.
+              </p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-800 mb-1">Technical approach</p>
+              <p className="text-gray-700">
+                Positions are calculated using{" "}
+                <a
+                  href="https://en.wikipedia.org/wiki/Principal_component_analysis"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-red-700 hover:underline"
+                >
+                  Principal Component Analysis (PCA)
+                </a>{" "}
+                on the member-vote matrix (Pour = +1, Contre = &minus;1, absent/abstained = not included). PCA finds the directions of greatest variation. Blocs are then identified using k-means clustering on the two-dimensional coordinates.
+              </p>
+            </div>
           </div>
         </div>
       </div>

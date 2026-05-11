@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql, TOPICS } from "@/lib/db";
+import { TrackView } from "@/lib/track-view";
 
 export const metadata: Metadata = {
   title: "How we score candidates — Methodology",
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function MethodologyPage() {
-  const stats = (
-    await sql`
+  const [statsRow, questionRowsAny] = await Promise.all([
+    sql`
       SELECT
         (SELECT COUNT(*) FROM candidates WHERE election_year = 2026) AS total,
         (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND classified_at IS NOT NULL) AS classified,
@@ -18,8 +19,27 @@ export default async function MethodologyPage() {
         (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND scrape_status = 'low_content') AS low_content,
         (SELECT COUNT(*) FROM canonical_questions WHERE election_year = 2026) AS questions,
         (SELECT MAX(scraped_at) FROM candidates WHERE election_year = 2026) AS last_scrape
-    `
-  )[0] as Record<string, unknown>;
+    `,
+    sql`
+      SELECT topic, statement
+      FROM canonical_questions
+      WHERE election_year = 2026
+      ORDER BY topic, sort_order
+    `,
+  ]);
+  const stats = statsRow[0] as Record<string, unknown>;
+  const questionRows = questionRowsAny as unknown as {
+    topic: string;
+    statement: string;
+  }[];
+
+  // Group up to 2 example statements per topic for the taxonomy section
+  const examplesByTopic = new Map<string, string[]>();
+  for (const r of questionRows) {
+    const arr = examplesByTopic.get(r.topic) ?? [];
+    if (arr.length < 2) arr.push(r.statement);
+    examplesByTopic.set(r.topic, arr);
+  }
 
   const lastRefreshed = stats.last_scrape
     ? new Date(String(stats.last_scrape)).toLocaleDateString("en-GB", {
@@ -31,6 +51,7 @@ export default async function MethodologyPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <TrackView event="candidate_methodology_viewed" />
       <Link
         href="/candidates"
         className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-red-700 mb-6"
@@ -151,20 +172,60 @@ export default async function MethodologyPage() {
       <Section title="The 16-topic taxonomy">
         <Prose>
           <p>
-            Every manifesto is classified against the same 16-category taxonomy
-            we use across the rest of this site for proposition classification.
-            That keeps candidate analysis directly comparable to voting-record
-            analysis.
+            Every manifesto is classified against the same 16-category
+            taxonomy we use across the rest of this site for proposition
+            classification — that keeps candidate analysis directly
+            comparable to voting-record analysis. Each topic below is
+            illustrated with one or two example statements from the
+            quiz&rsquo;s canonical question set, so the abstract category
+            name has something concrete attached.
           </p>
         </Prose>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-5 text-sm text-gray-700 dark:text-gray-300">
-          {TOPICS.map((t) => (
-            <li key={t} className="flex items-baseline gap-2">
-              <span className="w-1 h-1 bg-red-700 rounded-full flex-shrink-0" />
-              <span>{t}</span>
-            </li>
-          ))}
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+          {TOPICS.map((t) => {
+            const examples = examplesByTopic.get(t) ?? [];
+            return (
+              <li
+                key={t}
+                className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-4"
+              >
+                <p className="font-semibold text-gray-900 dark:text-gray-100 mb-2 text-sm">
+                  {t}
+                </p>
+                {examples.length === 0 ? (
+                  <p className="text-xs italic text-gray-400 dark:text-gray-500">
+                    No canonical questions defined for this topic.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {examples.map((ex, i) => (
+                      <li
+                        key={i}
+                        className="flex items-baseline gap-2 text-xs text-gray-600 dark:text-gray-400"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="text-red-700 flex-shrink-0"
+                        >
+                          ›
+                        </span>
+                        <span className="leading-snug">
+                          &ldquo;{ex}&rdquo;
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
         </ul>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+          These statements are taken verbatim from{" "}
+          <Code>pipeline/canonical_questions.yaml</Code> in the repo — that
+          file is the source of truth and is versioned with the rest of the
+          site.
+        </p>
       </Section>
 
       {/* How positions are extracted */}

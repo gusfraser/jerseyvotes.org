@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slugify";
+import { TrackView } from "@/lib/track-view";
 
 type CandidateFull = {
   candidate_id: number;
@@ -115,6 +116,16 @@ export default async function CandidateProfile({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <TrackView
+        event="candidate_profile_viewed"
+        params={{
+          slug: c.vote_je_slug,
+          name: c.full_name,
+          role: c.role ?? "",
+          is_incumbent: isIncumbent,
+          low_content: isLowContent,
+        }}
+      />
       <Link
         href="/candidates"
         className="text-sm text-gray-500 dark:text-gray-400 hover:text-red-700 inline-flex items-center gap-1 mb-6"

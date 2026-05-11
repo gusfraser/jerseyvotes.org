@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { sql, daysUntilElection } from "@/lib/db";
+import { TrackedLink } from "@/lib/track-click";
 
 const JERSEY_CONSTITUENCIES = [
   // 12 parishes (Connétable)
@@ -79,25 +80,34 @@ export default async function Home() {
             and based on every candidate&rsquo;s own published manifesto.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link
+            <TrackedLink
               href="/candidates/quiz"
+              event="home_cta_clicked"
+              params={{ cta: "find_your_candidate" }}
               className="bg-white text-red-800 px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
             >
               Find your candidate &rarr;
-            </Link>
-            <Link
+            </TrackedLink>
+            <TrackedLink
               href="/candidates"
+              event="home_cta_clicked"
+              params={{ cta: "browse_candidates" }}
               className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
             >
               {hasCandidateData
                 ? `Browse all ${totalCandidates} candidates`
                 : "Browse candidates"}
-            </Link>
+            </TrackedLink>
           </div>
           <p className="mt-4 text-sm text-red-200">
-            <Link href="/candidates/methodology" className="underline hover:text-white">
+            <TrackedLink
+              href="/candidates/methodology"
+              event="home_cta_clicked"
+              params={{ cta: "read_methodology" }}
+              className="underline hover:text-white"
+            >
               Read how we score candidates
-            </Link>
+            </TrackedLink>
           </p>
         </div>
       </section>

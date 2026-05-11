@@ -115,8 +115,14 @@ export function CandidateQuizClient() {
           setAnswers(saved.answers ?? {});
           setConstituency(saved.constituency ?? "");
           setStep(Math.min(saved.step, 2) as 0 | 1 | 2);
+          trackEvent("candidate_quiz_resumed", {
+            answers_saved: Object.keys(saved.answers ?? {}).length,
+            priorities_saved: (saved.priorities ?? []).length,
+            resumed_at_step: Math.min(saved.step, 2),
+          });
+        } else {
+          trackEvent("candidate_quiz_started");
         }
-        trackEvent("candidate_quiz_started");
       });
   }, []);
 
@@ -161,6 +167,9 @@ export function CandidateQuizClient() {
       <ResultsView
         payload={resultsPayload}
         onRetake={() => {
+          trackEvent("candidate_quiz_retaken", {
+            previous_top_match: resultsPayload.results[0]?.name ?? "",
+          });
           clearState();
           setPriorities([]);
           setAnswers({});
@@ -180,6 +189,7 @@ export function CandidateQuizClient() {
         <PriorityStep
           topics={data.topics}
           priorities={priorities}
+          questionsByTopic={questionsByTopic}
           onChange={setPriorities}
           onNext={() => {
             trackEvent("candidate_quiz_priorities_set", {
@@ -197,7 +207,10 @@ export function CandidateQuizClient() {
           priorities={priorities}
           answers={answers}
           onAnswer={(qid, a) => setAnswers((prev) => ({ ...prev, [qid]: a }))}
-          onBack={() => setStep(0)}
+          onBack={() => {
+            trackEvent("candidate_quiz_back", { from_step: 1, to_step: 0 });
+            setStep(0);
+          }}
           onNext={() => {
             trackEvent("candidate_quiz_stances_set", {
               answered: Object.values(answers).filter((a) => a !== "skip").length,
@@ -211,7 +224,10 @@ export function CandidateQuizClient() {
         <ConstituencyStep
           value={constituency}
           onChange={setConstituency}
-          onBack={() => setStep(1)}
+          onBack={() => {
+            trackEvent("candidate_quiz_back", { from_step: 2, to_step: 1 });
+            setStep(1);
+          }}
           onSubmit={async () => {
             if (submitting) return;
             setSubmitting(true);
@@ -228,13 +244,21 @@ export function CandidateQuizClient() {
               const body = (await resp.json()) as ResultsPayload;
               setResultsPayload(body);
               setStep(3);
+              const answeredCount = Object.values(answers).filter(
+                (a) => a !== "skip",
+              ).length;
               trackEvent("candidate_quiz_completed", {
                 results_returned: body.results.length,
                 top_match: body.results[0]?.name ?? "",
                 top_match_pct: body.results[0]
                   ? Math.round(body.results[0].match * 100)
                   : 0,
+                top_match_low_coverage: body.results[0]?.low_coverage ?? false,
                 constituency_filtered: !!constituency,
+                constituency: constituency || "(none)",
+                priorities_count: priorities.length,
+                priority_topics: priorities.join("|"),
+                stances_answered: answeredCount,
               });
             } finally {
               setSubmitting(false);
@@ -308,15 +332,20 @@ function StepIndicator({ step }: { step: number }) {
 function PriorityStep({
   topics,
   priorities,
+  questionsByTopic,
   onChange,
   onNext,
 }: {
   topics: string[];
   priorities: string[];
+  questionsByTopic: Map<string, Question[]>;
   onChange: (p: string[]) => void;
   onNext: () => void;
 }) {
   const max = 5;
+  // Which topic's help tooltip is currently open. One at a time so things
+  // don't get cluttered; mobile users tap to open, tap again to close.
+  const [openHelp, setOpenHelp] = useState<string | null>(null);
 
   function toggle(topic: string) {
     if (priorities.includes(topic)) {
@@ -342,7 +371,10 @@ function PriorityStep({
       </h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
         Pick up to <strong>5</strong> topics, then drag them into your priority
-        order. Topics ranked higher count more in the score.
+        order. Topics ranked higher count more in the score. Not sure what
+        a topic covers? Tap the{" "}
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 dark:bg-zinc-700 text-[10px] font-bold text-gray-700 dark:text-gray-200 align-middle">?</span>{" "}
+        icon for example statements.
       </p>
 
       {priorities.length > 0 && (
@@ -398,27 +430,103 @@ function PriorityStep({
         {topics.map((t) => {
           const selected = priorities.includes(t);
           const atMax = !selected && priorities.length >= max;
+          const examples =
+            questionsByTopic.get(t)?.slice(0, 3).map((q) => q.statement) ?? [];
+          const isHelpOpen = openHelp === t;
+
+          const rowClass = selected
+            ? "border-red-700 bg-red-50 dark:bg-red-900/30"
+            : atMax
+            ? "border-gray-200 dark:border-zinc-800 opacity-60"
+            : "border-gray-200 dark:border-zinc-800 hover:border-red-300";
+
+          const labelClass = selected
+            ? "text-red-700 dark:text-red-300 font-medium"
+            : atMax
+            ? "text-gray-400 dark:text-gray-600"
+            : "text-gray-700 dark:text-gray-300";
+
           return (
-            <button
+            <div
               key={t}
-              type="button"
-              disabled={atMax}
-              onClick={() => toggle(t)}
-              className={`text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
-                selected
-                  ? "border-red-700 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-medium"
-                  : atMax
-                  ? "border-gray-200 dark:border-zinc-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
-                  : "border-gray-200 dark:border-zinc-800 text-gray-700 dark:text-gray-300 hover:border-red-300"
-              }`}
+              className={`relative flex items-stretch rounded-lg border text-sm transition-colors ${rowClass}`}
             >
-              {selected && (
-                <span className="inline-block w-5 text-red-700 dark:text-red-300">
-                  {priorities.indexOf(t) + 1}.
-                </span>
+              <button
+                type="button"
+                disabled={atMax}
+                onClick={() => toggle(t)}
+                className={`flex-1 text-left px-3 py-2 rounded-l-lg ${
+                  atMax ? "cursor-not-allowed" : ""
+                } ${labelClass}`}
+              >
+                {selected && (
+                  <span className="inline-block w-5 text-red-700 dark:text-red-300">
+                    {priorities.indexOf(t) + 1}.
+                  </span>
+                )}
+                {t}
+              </button>
+              {examples.length > 0 && (
+                <button
+                  type="button"
+                  aria-label={`Show example statements for ${t}`}
+                  aria-expanded={isHelpOpen}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenHelp(isHelpOpen ? null : t);
+                  }}
+                  onMouseEnter={() => setOpenHelp(t)}
+                  onMouseLeave={() =>
+                    setOpenHelp((cur) => (cur === t ? null : cur))
+                  }
+                  onFocus={() => setOpenHelp(t)}
+                  onBlur={() =>
+                    setOpenHelp((cur) => (cur === t ? null : cur))
+                  }
+                  className={`flex-shrink-0 w-9 flex items-center justify-center rounded-r-lg border-l text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-red-700 ${
+                    selected
+                      ? "border-red-300 dark:border-red-800"
+                      : "border-gray-200 dark:border-zinc-800"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 dark:bg-zinc-700 text-[10px] font-bold"
+                  >
+                    ?
+                  </span>
+                </button>
               )}
-              {t}
-            </button>
+
+              {isHelpOpen && examples.length > 0 && (
+                <div
+                  role="tooltip"
+                  className="absolute z-20 left-0 right-0 top-full mt-2 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-xs text-gray-700 dark:text-gray-300"
+                >
+                  <p className="font-semibold text-gray-900 dark:text-gray-100 mb-2 text-[11px] uppercase tracking-wide">
+                    Example statements in this topic
+                  </p>
+                  <ul className="space-y-1.5">
+                    {examples.map((ex, i) => (
+                      <li
+                        key={i}
+                        className="flex items-baseline gap-1.5 leading-snug"
+                      >
+                        <span className="text-red-700 flex-shrink-0">›</span>
+                        <span>&ldquo;{ex}&rdquo;</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => setOpenHelp(null)}
+                    className="mt-2 text-[10px] text-gray-400 hover:text-red-700 sm:hidden"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -705,6 +813,15 @@ function ResultsView({
           </p>
           <Link
             href={`/candidates/${top.slug}`}
+            onClick={() =>
+              trackEvent("candidate_quiz_result_clicked", {
+                rank: 1,
+                slug: top.slug,
+                name: top.name,
+                match_pct: Math.round(top.match * 100),
+                from: "top_match",
+              })
+            }
             className="text-3xl font-bold text-red-700 hover:underline"
           >
             {top.name}
@@ -747,6 +864,15 @@ function ResultsView({
           <Link
             key={r.candidate_id}
             href={`/candidates/${r.slug}`}
+            onClick={() =>
+              trackEvent("candidate_quiz_result_clicked", {
+                rank: i + 1,
+                slug: r.slug,
+                name: r.name,
+                match_pct: Math.round(r.match * 100),
+                from: "ranked_list",
+              })
+            }
             className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-3 hover:border-red-300 transition-colors"
           >
             <span className="w-6 text-right text-sm font-bold text-gray-400">
@@ -821,7 +947,13 @@ function ResultsView({
           Retake quiz
         </button>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          <Link href="/candidates/methodology" className="underline hover:text-red-700">
+          <Link
+            href="/candidates/methodology"
+            onClick={() =>
+              trackEvent("candidate_quiz_methodology_clicked", { from: "results" })
+            }
+            className="underline hover:text-red-700"
+          >
             How are these scores calculated?
           </Link>
         </p>

@@ -74,6 +74,80 @@ export function daysUntilElection(now: Date = new Date()): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+// Jersey's electoral structure for 2026:
+//   Senator   — island-wide (constituency NULL); every voter can vote
+//   Connétable — exactly one per parish (constituency == parish name)
+//   Deputy    — by district; districts can:
+//                 (a) match a parish 1:1 (St Brelade, St Clement, St Saviour),
+//                 (b) split a parish (3 districts inside St Helier), or
+//                 (c) combine parishes ("Grouville and St Martin", etc.).
+//
+// PARISH_DISTRICTS maps each parish to the list of `candidates.constituency`
+// values relevant to a voter living in that parish — the parish itself (for
+// the Connétable) plus any district covering that parish (for Deputies).
+// Senators are always added on top by the filter logic, not by this map.
+export const PARISHES = [
+  "St Helier",
+  "St Saviour",
+  "St Brelade",
+  "St Clement",
+  "St Lawrence",
+  "Trinity",
+  "Grouville",
+  "St Peter",
+  "St Ouen",
+  "St John",
+  "St Martin",
+  "St Mary",
+] as const;
+export type Parish = (typeof PARISHES)[number];
+
+export const PARISH_DISTRICTS: Record<Parish, string[]> = {
+  "St Helier": [
+    "St Helier",
+    "St Helier South",
+    "St Helier Central",
+    "St Helier North",
+  ],
+  "St Saviour": ["St Saviour"],
+  "St Brelade": ["St Brelade"],
+  "St Clement": ["St Clement"],
+  "St Lawrence": ["St Lawrence", "St John, St Lawrence and Trinity"],
+  "Trinity": ["Trinity", "St John, St Lawrence and Trinity"],
+  "Grouville": ["Grouville", "Grouville and St Martin"],
+  "St Peter": ["St Peter", "St Mary, St Ouen and St Peter"],
+  "St Ouen": ["St Ouen", "St Mary, St Ouen and St Peter"],
+  "St John": ["St John", "St John, St Lawrence and Trinity"],
+  "St Martin": ["St Martin", "Grouville and St Martin"],
+  "St Mary": ["St Mary", "St Mary, St Ouen and St Peter"],
+};
+
+/**
+ * Resolve a `constituency` query value (which may be a parish, a specific
+ * district, or empty) into the SQL/filter shape we want:
+ *   - constituencies: list of values to match `candidates.constituency` against
+ *     (null = no filter)
+ *   - includeSenators: whether to OR in role='Senator' (senators have no
+ *     constituency, but the voter can still vote for them)
+ *
+ * Picking a parish expands to "everyone a voter there can vote for".
+ * Picking a specific district stays literal (no Senator overlay) — that's
+ * a power-user / explore-the-data view, not a personal-vote view.
+ */
+export function expandConstituency(value: string | null | undefined): {
+  constituencies: string[] | null;
+  includeSenators: boolean;
+} {
+  if (!value) return { constituencies: null, includeSenators: false };
+  if ((PARISHES as readonly string[]).includes(value)) {
+    return {
+      constituencies: PARISH_DISTRICTS[value as Parish],
+      includeSenators: true,
+    };
+  }
+  return { constituencies: [value], includeSenators: false };
+}
+
 export type Candidate = {
   candidate_id: number;
   vote_je_slug: string;

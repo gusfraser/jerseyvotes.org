@@ -631,9 +631,23 @@ function ConstituencyStep({
       <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">
         Where do you vote? (optional)
       </h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
         Choose your parish to filter results to candidates you can actually
-        vote for. Skip to see all 92 candidates ranked.
+        vote for: <strong>1 Connétable</strong>, <strong>2&ndash;4 Deputies</strong>{" "}
+        (depending on your constituency), and <strong>up to 9 Senators</strong>{" "}
+        (island-wide). Skip to see all 92 candidates ranked.
+      </p>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+        Not sure which constituency you&rsquo;re in?{" "}
+        <a
+          href="https://www.vote.je/constituency-finder/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-red-700 underline hover:no-underline"
+        >
+          Look up by postcode on vote.je
+        </a>
+        .
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
@@ -696,7 +710,9 @@ function ResultsView({
             {top.name}
           </Link>
           <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-            {[top.role, top.constituency].filter(Boolean).join(" — ")}
+            {[top.role, top.constituency ?? (top.role === "Senator" ? "island-wide" : null)]
+              .filter(Boolean)
+              .join(" — ")}
           </p>
           <p className="text-5xl font-bold text-green-600 mt-4">
             {Math.round(top.match * 100)}%
@@ -766,7 +782,13 @@ function ResultsView({
                 )}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {[r.role, r.constituency, r.party].filter(Boolean).join(" — ")}
+                {[
+                  r.role,
+                  r.constituency ?? (r.role === "Senator" ? "island-wide" : null),
+                  r.party,
+                ]
+                  .filter(Boolean)
+                  .join(" — ")}
               </p>
             </div>
             <div className="text-right">

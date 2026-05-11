@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sql, TOPICS } from "@/lib/db";
+import { sql, TOPICS, expandConstituency } from "@/lib/db";
 
 // Priority weight for a topic given its rank (0-indexed). The 5 ranked topics
 // get weights 5, 4, 3, 2, 1; unranked topics get weight 0. Published in the
@@ -95,6 +95,9 @@ export async function POST(request: Request) {
   }
   const stances = body.stances ?? {};
   const constituency = body.constituency?.trim() || null;
+  // Resolve a parish to all relevant constituencies + an "include senators"
+  // flag. Senators are island-wide so every voter can vote for them.
+  const expansion = expandConstituency(constituency);
 
   const [candidatesRawAny, topicsRawAny, stancesRawAny, questionRowsAny] = await Promise.all([
     sql`
@@ -169,7 +172,11 @@ export async function POST(request: Request) {
   }
 
   const results = candidatesRaw
-    .filter((c) => !constituency || c.constituency === constituency)
+    .filter((c) => {
+      if (!expansion.constituencies) return true; // no filter — show all
+      if (expansion.includeSenators && c.role === "Senator") return true;
+      return c.constituency !== null && expansion.constituencies.includes(c.constituency);
+    })
     .map((c) => {
       const candTopics = topicsByCand.get(c.candidate_id) ?? new Map<string, number>();
       const candStances = stancesByCand.get(c.candidate_id) ?? new Map();

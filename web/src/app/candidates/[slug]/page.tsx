@@ -144,7 +144,12 @@ export default async function CandidateProfile({
               {c.full_name}
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">
-              {[c.role, c.constituency].filter(Boolean).join(" — ")}
+              {[
+                c.role,
+                c.constituency ?? (c.role === "Senator" ? "island-wide" : null),
+              ]
+                .filter(Boolean)
+                .join(" — ")}
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               {c.party && (

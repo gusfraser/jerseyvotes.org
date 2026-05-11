@@ -66,6 +66,62 @@ export default async function MethodologyPage() {
         </div>
       </Section>
 
+      {/* How Jersey voting works */}
+      <Section title="How Jersey voting works">
+        <Prose>
+          <p>
+            On <strong>Sunday 7 June 2026</strong> every voter elects three
+            different types of States Member:
+          </p>
+        </Prose>
+        <ul className="space-y-2 mt-4 text-sm text-gray-700 dark:text-gray-300">
+          <li className="flex items-baseline gap-2">
+            <span className="w-1.5 h-1.5 bg-red-700 rounded-full flex-shrink-0" />
+            <span>
+              <strong>Senators</strong> — up to <strong>9</strong> candidates,
+              elected to represent the whole Island. Every voter sees the same
+              17-candidate Senator list.
+            </span>
+          </li>
+          <li className="flex items-baseline gap-2">
+            <span className="w-1.5 h-1.5 bg-red-700 rounded-full flex-shrink-0" />
+            <span>
+              <strong>Connétable</strong> (Constable) — exactly{" "}
+              <strong>1</strong> per parish. Voters pick from candidates
+              standing in their parish only.
+            </span>
+          </li>
+          <li className="flex items-baseline gap-2">
+            <span className="w-1.5 h-1.5 bg-red-700 rounded-full flex-shrink-0" />
+            <span>
+              <strong>Deputies</strong> — <strong>2 to 4</strong> per
+              constituency, depending on which of the nine Deputy
+              constituencies you live in. Some constituencies match a single
+              parish; some split a parish (3 districts inside St Helier); some
+              combine parishes (e.g. &ldquo;St Mary, St Ouen and St Peter&rdquo;).
+            </span>
+          </li>
+        </ul>
+        <Prose className="mt-4">
+          <p>
+            Source:{" "}
+            <ExternalLink href="https://www.vote.je/">vote.je</ExternalLink>
+            , maintained by the States Greffe. Not sure which Deputy
+            constituency covers your address? Use the official{" "}
+            <ExternalLink href="https://www.vote.je/constituency-finder/">
+              constituency finder
+            </ExternalLink>{" "}
+            on vote.je to look it up by postcode.
+          </p>
+          <p>
+            When you pick your parish in the quiz or on the candidates index,
+            we show you everyone you can actually vote for: the Connétable for
+            that parish, the Deputies standing in whichever constituency
+            covers it, and all Senators.
+          </p>
+        </Prose>
+      </Section>
+
       {/* Data sources */}
       <Section title="Data sources">
         <Prose>

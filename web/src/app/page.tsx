@@ -143,7 +143,18 @@ export default async function Home() {
             Know your parish? Jump straight in.
           </h2>
           <p className="text-gray-500 dark:text-gray-400 mb-5">
-            See only the candidates standing where you can vote.
+            See the candidates you can actually vote for: 1 Connétable for your
+            parish, 2&ndash;4 Deputies for your constituency, and up to 9 Senators
+            (island-wide).{" "}
+            <a
+              href="https://www.vote.je/constituency-finder/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-red-700"
+            >
+              Find your constituency by postcode
+            </a>
+            .
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {JERSEY_CONSTITUENCIES.map((c) => (

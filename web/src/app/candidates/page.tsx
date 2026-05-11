@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { sql, daysUntilElection } from "@/lib/db";
+import { sql, daysUntilElection, expandConstituency, PARISHES } from "@/lib/db";
 
 export const metadata: Metadata = {
   title: "Candidates - Jersey 2026 election",
@@ -43,6 +43,14 @@ export default async function CandidatesPage({
   const topic = params.topic?.trim() || null;
   const search = params.q?.trim() || null;
 
+  // Parish → list-of-constituencies expansion. Picking "St Helier" should
+  // return Connétable + 3 Deputy districts + all Senators; picking a literal
+  // district stays exact. See web/src/lib/db.ts:expandConstituency.
+  const expansion = expandConstituency(constituency);
+  const constituencyList = expansion.constituencies;       // null = no filter
+  const includeSenators = expansion.includeSenators;
+  const isParishFilter = constituency !== null && (PARISHES as readonly string[]).includes(constituency);
+
   const candidates = (await sql`
     SELECT c.candidate_id, c.vote_je_slug, c.full_name, c.role, c.constituency,
            c.party, c.photo_url, c.incumbent_member_id, c.scrape_status,
@@ -54,7 +62,11 @@ export default async function CandidatesPage({
            ) AS topics
     FROM candidates c
     WHERE c.election_year = 2026
-      AND (${constituency}::text IS NULL OR c.constituency = ${constituency})
+      AND (
+        ${constituencyList === null}::boolean
+        OR c.constituency = ANY(${constituencyList ?? []}::text[])
+        OR (${includeSenators}::boolean AND c.role = 'Senator')
+      )
       AND (${role}::text IS NULL OR c.role = ${role})
       AND (${party}::text IS NULL OR c.party = ${party})
       AND (${search}::text IS NULL OR c.full_name ILIKE ${"%" + (search ?? "") + "%"})
@@ -94,6 +106,24 @@ export default async function CandidatesPage({
         </div>
         <p className="text-gray-500 dark:text-gray-400 max-w-3xl">
           {candidates.length} {activeFilters > 0 ? "matching" : "candidates"} standing in the 2026 Jersey election.
+          {isParishFilter && (
+            <>
+              {" "}Showing everyone a voter in <strong>{constituency}</strong> can vote for.
+              On polling day you pick <strong>up to 9 Senators</strong> (island-wide),{" "}
+              <strong>1 Connétable</strong> for your parish, and{" "}
+              <strong>2&ndash;4 Deputies</strong> depending on your constituency
+              (
+              <a
+                href="https://www.vote.je/constituency-finder/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-red-700"
+              >
+                look up your constituency
+              </a>
+              ).
+            </>
+          )}{" "}
           Each manifesto has been classified against{" "}
           <Link href="/candidates/methodology" className="underline hover:text-red-700">
             16 policy topics
@@ -246,8 +276,12 @@ function CandidateCard({ c }: { c: CandidateRow }) {
           </p>
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex-wrap">
             {c.role && <span>{c.role}</span>}
-            {c.constituency && <span>·</span>}
-            {c.constituency && <span className="truncate">{c.constituency}</span>}
+            {(c.constituency || c.role === "Senator") && <span>·</span>}
+            {c.constituency ? (
+              <span className="truncate">{c.constituency}</span>
+            ) : c.role === "Senator" ? (
+              <span className="truncate italic">island-wide</span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {c.party && (

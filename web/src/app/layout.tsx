@@ -65,7 +65,7 @@ export default function RootLayout({
         <footer className="bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 py-8 mt-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
             <p>
-              Data sourced from{" "}
+              Voting data from{" "}
               <a
                 href="https://statesassembly.je/votes"
                 className="text-red-700 hover:underline"
@@ -73,8 +73,24 @@ export default function RootLayout({
                 rel="noopener noreferrer"
               >
                 States Assembly of Jersey
+              </a>{" "}
+              (2004&ndash;2026). Candidate profiles from{" "}
+              <a
+                href="https://www.vote.je/candidates"
+                className="text-red-700 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                vote.je
+              </a>{" "}
+              (States Greffe). See our{" "}
+              <a
+                href="/candidates/methodology"
+                className="text-red-700 hover:underline"
+              >
+                methodology
               </a>
-              . Covering 2004&ndash;2026.
+              .
             </p>
           </div>
         </footer>

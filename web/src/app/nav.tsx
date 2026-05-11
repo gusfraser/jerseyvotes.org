@@ -4,15 +4,28 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navLinks = [
+const navLinks: { href: string; label: string; highlight?: boolean }[] = [
+  { href: "/candidates", label: "Candidates", highlight: true },
+  { href: "/candidates/quiz", label: "Voting Quiz" },
   { href: "/members", label: "Members" },
   { href: "/votes", label: "Votes" },
   { href: "/divisive", label: "Divisive" },
   { href: "/alignment", label: "Alignment" },
   { href: "/blocs", label: "Blocs" },
-  { href: "/quiz", label: "Voter Quiz" },
   { href: "/about", label: "About" },
 ];
+
+// Pick the single most-specific link to highlight for a given pathname.
+// e.g. on /candidates/quiz we want "Voting Quiz" active, not "Candidates".
+function activeHref(pathname: string): string | null {
+  let best: string | null = null;
+  for (const { href } of navLinks) {
+    if (pathname === href || pathname.startsWith(href + "/")) {
+      if (best === null || href.length > best.length) best = href;
+    }
+  }
+  return best;
+}
 
 function useTheme() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -39,6 +52,7 @@ export function Nav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
+  const activeLink = activeHref(pathname);
 
   return (
     <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 sticky top-0 z-50">
@@ -54,19 +68,32 @@ export function Nav() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === link.href
-                    ? "text-red-700 bg-red-50 dark:bg-red-900/30"
-                    : "text-gray-600 dark:text-gray-300 hover:text-red-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = activeLink === link.href;
+              // Suppress the CTA pill when the user is already inside this
+              // section (i.e. the active link is this link, or a descendant
+              // of it). The highlight is for advertising — no point shouting
+              // once you've arrived.
+              const inSection =
+                activeLink !== null &&
+                (activeLink === link.href || activeLink.startsWith(link.href + "/"));
+              const baseHighlight = link.highlight && !inSection
+                ? "text-white bg-red-700 hover:bg-red-800 hover:text-white"
+                : "text-gray-600 dark:text-gray-300 hover:text-red-700 hover:bg-gray-50 dark:hover:bg-gray-800";
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? "text-red-700 bg-red-50 dark:bg-red-900/30"
+                      : baseHighlight
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
 
             {/* Theme toggle */}
             <button
@@ -126,20 +153,29 @@ export function Nav() {
       {open && (
         <nav className="md:hidden border-t border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
           <div className="px-4 py-2 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  pathname === link.href
-                    ? "text-red-700 bg-red-50 dark:bg-red-900/30"
-                    : "text-gray-600 dark:text-gray-300 hover:text-red-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = activeLink === link.href;
+              const inSection =
+                activeLink !== null &&
+                (activeLink === link.href || activeLink.startsWith(link.href + "/"));
+              const baseHighlight = link.highlight && !inSection
+                ? "text-white bg-red-700 hover:bg-red-800"
+                : "text-gray-600 dark:text-gray-300 hover:text-red-700 hover:bg-gray-50 dark:hover:bg-gray-800";
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setOpen(false)}
+                  className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? "text-red-700 bg-red-50 dark:bg-red-900/30"
+                      : baseHighlight
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
         </nav>
       )}

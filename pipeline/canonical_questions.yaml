@@ -1,0 +1,218 @@
+# Canonical policy questions for the candidate quiz.
+# - Each question is a neutrally-framed agree/disagree statement.
+# - Topics MUST match CATEGORIES in pipeline/classify.py exactly.
+# - 2-3 questions per topic. Keep statements specific and Jersey-relevant.
+# - When editing, bump election_year if the question set shifts between cycles.
+#
+# This file is the source of truth; pipeline/classify_candidates.py upserts it
+# into the canonical_questions table on each run.
+
+election_year: 2026
+
+questions:
+
+  # --- Government & Administration ---
+  - id: gov.ministerial_accountability
+    topic: Government & Administration
+    statement: Ministers should face stronger public accountability mechanisms, including binding scrutiny review.
+    explainer: Scrutiny Panels can recommend but cannot bind Ministers; some candidates propose tighter checks.
+
+  - id: gov.civil_service_size
+    topic: Government & Administration
+    statement: Jersey's civil service has grown too large and should be reduced.
+    explainer: Headcount and spending on senior officers have been a recurring debate.
+
+  # --- Constitutional & Electoral ---
+  - id: const.senator_reinstatement
+    topic: Constitutional & Electoral
+    statement: Jersey should reinstate island-wide Senator seats in the States Assembly.
+    explainer: Senators were removed in 2022; reinstatement has been debated each term since.
+
+  - id: const.party_politics
+    topic: Constitutional & Electoral
+    statement: Organised political parties are good for Jersey democracy.
+    explainer: Jersey is traditionally an independent-dominated assembly; party politics is contested.
+
+  - id: const.voting_age_16
+    topic: Constitutional & Electoral
+    statement: The voting age in Jersey should be lowered to 16.
+    explainer: Multiple proposals have come forward; debated alongside electoral reform.
+
+  # --- Finance & Taxation ---
+  - id: fin.gst_increase
+    topic: Finance & Taxation
+    statement: Jersey should keep GST at 5% rather than raise it to fund public services.
+    explainer: GST is currently 5%; proposals to raise it have been floated to address deficits.
+
+  - id: fin.high_value_residents
+    topic: Finance & Taxation
+    statement: Jersey should review and tighten the tax regime for high-value residents (2(1)(e)).
+    explainer: A small number of wealthy residents pay a capped income tax under a special regime.
+
+  - id: fin.balanced_budget
+    topic: Finance & Taxation
+    statement: Jersey should run balanced budgets rather than borrow to fund capital projects.
+    explainer: Recent budgets have used borrowing for hospital and infrastructure spending.
+
+  # --- Employment & Social Security ---
+  - id: emp.minimum_wage_living
+    topic: Employment & Social Security
+    statement: The Jersey minimum wage should be raised to match the Living Wage.
+    explainer: Minimum wage and Living Wage have diverged; raising it is regularly debated.
+
+  - id: emp.pension_age
+    topic: Employment & Social Security
+    statement: The States should protect current Social Security pension entitlements without raising the pension age further.
+    explainer: Demographic pressure has prompted debate about raising the pension age.
+
+  # --- Transport & Infrastructure ---
+  - id: trans.active_travel
+    topic: Transport & Infrastructure
+    statement: Jersey should prioritise active travel (walking, cycling) over road capacity expansion.
+    explainer: Active-travel investment vs road widening has been a recurring planning debate.
+
+  - id: trans.public_transport
+    topic: Transport & Infrastructure
+    statement: Jersey should significantly expand subsidised public bus services.
+    explainer: Bus subsidies and route expansion vs cost-recovery have been debated.
+
+  # --- Planning & Environment ---
+  - id: env.green_belt
+    topic: Planning & Environment
+    statement: Protected countryside and green zones must not be rezoned for housing development.
+    explainer: Housing pressure has prompted proposals to release some green-zone land.
+
+  - id: env.net_zero_2050
+    topic: Planning & Environment
+    statement: Jersey should maintain its 2050 net-zero target with no delay.
+    explainer: Carbon Neutral Roadmap commitments have faced pushback on cost.
+
+  - id: env.single_use_plastics
+    topic: Planning & Environment
+    statement: Jersey should ban more categories of single-use plastics and packaging.
+    explainer: Some plastic bans have been enacted; further bans are debated.
+
+  # --- Financial Services & Regulation ---
+  - id: finsvc_industry_size
+    topic: Financial Services & Regulation
+    statement: Jersey should reduce its economic dependence on the finance industry by diversifying the economy.
+    explainer: Finance accounts for ~40% of GVA; diversification vs growth is debated.
+
+  - id: finsvc_beneficial_ownership
+    topic: Financial Services & Regulation
+    statement: Jersey should make beneficial ownership of companies fully public.
+    explainer: The register is currently accessible to authorities but not the public.
+
+  # --- Health & Wellbeing ---
+  - id: health.new_hospital_overdale
+    topic: Health & Wellbeing
+    statement: The new hospital should be delivered at the current planned site without further site changes.
+    explainer: The hospital project has been re-sited multiple times; further delays are contested.
+
+  - id: health.mental_health_funding
+    topic: Health & Wellbeing
+    statement: Mental health services should receive significantly more funding, even if it means trade-offs elsewhere.
+    explainer: Mental health funding levels and wait times have been a major political issue.
+
+  - id: health.assisted_dying
+    topic: Health & Wellbeing
+    statement: Jersey should introduce legal assisted dying for terminally ill adults.
+    explainer: The Assembly has voted in principle to allow assisted dying; implementation is ongoing.
+
+  # --- Property & Land ---
+  - id: prop.public_land_housing
+    topic: Property & Land
+    statement: Publicly-owned land should be prioritised for affordable and social housing rather than market sale.
+    explainer: How States-owned land is disposed of (sold or developed) is repeatedly debated.
+
+  - id: prop.compulsory_purchase
+    topic: Property & Land
+    statement: The States should make more use of compulsory purchase powers to unlock derelict sites.
+    explainer: Long-empty properties and compulsory purchase have been debated.
+
+  # --- Housing ---
+  - id: housing.affordable_target
+    topic: Housing
+    statement: Jersey should set binding annual targets for affordable housing delivery.
+    explainer: Current targets are aspirational; binding targets are proposed.
+
+  - id: housing.rent_controls
+    topic: Housing
+    statement: Jersey should introduce rent stabilisation or controls to limit annual rent increases.
+    explainer: Rapidly rising rents have prompted calls for rent regulation.
+
+  - id: housing.immigration_link
+    topic: Housing
+    statement: Housing pressure is best addressed by tighter limits on inward migration.
+    explainer: Linking population policy to housing supply is a recurring framing.
+
+  # --- Justice & Policing ---
+  - id: justice.policing_resources
+    topic: Justice & Policing
+    statement: The States of Jersey Police should receive increased funding and headcount.
+    explainer: Police resourcing levels are debated in successive Government Plans.
+
+  - id: justice.sentencing_reform
+    topic: Justice & Policing
+    statement: Jersey should focus on rehabilitation and community sentences rather than expanding the prison.
+    explainer: Sentencing policy and La Moye expansion proposals have been debated.
+
+  # --- Consumer & Commercial ---
+  - id: consumer.competition_powers
+    topic: Consumer & Commercial
+    statement: The Jersey Competition Regulatory Authority should be given stronger powers to act against high consumer prices.
+    explainer: High Jersey prices for goods/services have prompted calls for regulator action.
+
+  - id: consumer.cost_of_living_subsidies
+    topic: Consumer & Commercial
+    statement: The States should fund ongoing targeted cost-of-living support payments for lower-income households.
+    explainer: One-off and recurring cost-of-living support is a recurring political question.
+
+  # --- Children, Education & Families ---
+  - id: edu.free_higher_ed
+    topic: Children, Education & Families
+    statement: Higher education tuition for Jersey students should be made fully free, funded by the States.
+    explainer: Currently means-tested; full free higher education has been proposed.
+
+  - id: edu.early_years
+    topic: Children, Education & Families
+    statement: Free nursery hours for under-fives should be substantially expanded.
+    explainer: Childcare costs and free hours have been a campaign issue.
+
+  - id: edu.private_schools_funding
+    topic: Children, Education & Families
+    statement: States subsidies to fee-paying schools should be reduced or removed.
+    explainer: Public funding for non-provided schools (fee-paying) is contested.
+
+  # --- International & Trade ---
+  - id: intl.uk_relationship
+    topic: International & Trade
+    statement: Jersey should pursue greater autonomy from the UK in international representation.
+    explainer: The UK handles much of Jersey's external affairs; greater autonomy is debated.
+
+  - id: intl.eu_alignment
+    topic: International & Trade
+    statement: Jersey should align more closely with EU regulatory standards to maintain market access.
+    explainer: Post-Brexit, alignment with EU rules vs divergence is a live question.
+
+  # --- Equality & Human Rights ---
+  - id: equality.discrimination_protections
+    topic: Equality & Human Rights
+    statement: Discrimination Law protections should be extended to cover further protected characteristics.
+    explainer: Jersey's Discrimination Law has been extended in stages; further extension is debated.
+
+  - id: equality.gender_pay_reporting
+    topic: Equality & Human Rights
+    statement: Jersey should require mandatory gender pay gap reporting for medium and large employers.
+    explainer: Pay gap reporting is not currently mandatory in Jersey.
+
+  # --- Agriculture, Fisheries & Rural ---
+  - id: agri.farming_subsidies
+    topic: Agriculture, Fisheries & Rural
+    statement: Direct subsidies to Jersey farming should be increased to preserve the rural economy.
+    explainer: Agricultural support payments have been reformed multiple times.
+
+  - id: agri.fisheries_french_access
+    topic: Agriculture, Fisheries & Rural
+    statement: Jersey should maintain tight controls on French vessels accessing Jersey waters.
+    explainer: Post-Brexit access disputes have been a high-profile issue.

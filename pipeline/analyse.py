@@ -14,7 +14,9 @@ from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from sklearn.decomposition import PCA
 
-load_dotenv()
+# override=True so a shell-exported DATABASE_URL/ANTHROPIC_API_KEY doesn't
+# shadow the value in .env (python-dotenv defaults to NOT overriding).
+load_dotenv(override=True)
 
 
 def get_connection():

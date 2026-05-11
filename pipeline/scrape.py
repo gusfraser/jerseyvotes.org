@@ -14,7 +14,9 @@ import psycopg2
 from psycopg2.extras import execute_batch
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True so a shell-exported DATABASE_URL/ANTHROPIC_API_KEY doesn't
+# shadow the value in .env (python-dotenv defaults to NOT overriding).
+load_dotenv(override=True)
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)',

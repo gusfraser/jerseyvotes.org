@@ -46,3 +46,80 @@ export type Vote = {
   vote: string;
   vote_category: string;
 };
+
+export const TOPICS = [
+  "Government & Administration",
+  "Constitutional & Electoral",
+  "Finance & Taxation",
+  "Employment & Social Security",
+  "Transport & Infrastructure",
+  "Planning & Environment",
+  "Financial Services & Regulation",
+  "Health & Wellbeing",
+  "Property & Land",
+  "Housing",
+  "Justice & Policing",
+  "Consumer & Commercial",
+  "Children, Education & Families",
+  "International & Trade",
+  "Equality & Human Rights",
+  "Agriculture, Fisheries & Rural",
+] as const;
+export type Topic = (typeof TOPICS)[number];
+
+export const ELECTION_DATE = new Date("2026-06-07T00:00:00Z");
+
+export function daysUntilElection(now: Date = new Date()): number {
+  const ms = ELECTION_DATE.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
+}
+
+export type Candidate = {
+  candidate_id: number;
+  vote_je_slug: string;
+  profile_url: string;
+  full_name: string;
+  canonical_name: string | null;
+  role: string | null;
+  constituency: string | null;
+  party: string | null;
+  photo_url: string | null;
+  email: string | null;
+  phone: string | null;
+  manifesto_text: string | null;
+  manifesto_word_count: number | null;
+  incumbent_member_id: number | null;
+  scrape_status: string;
+  scraped_at: string;
+  classified_at: string | null;
+  correction_state: string;
+  election_year: number;
+};
+
+export type CandidateTopic = {
+  candidate_id: number;
+  topic: Topic;
+  salience: number;
+  summary: string | null;
+  source_quote: string | null;
+};
+
+export type CanonicalQuestion = {
+  question_id: string;
+  topic: Topic;
+  statement: string;
+  explainer: string | null;
+  election_year: number;
+  sort_order: number;
+};
+
+export type Stance = "agree" | "disagree" | "neutral" | "not_addressed";
+
+export type CandidateStance = {
+  candidate_id: number;
+  question_id: string;
+  stance: Stance;
+  confidence: number;
+  source_quote: string | null;
+  corrected_stance: Stance | null;
+};

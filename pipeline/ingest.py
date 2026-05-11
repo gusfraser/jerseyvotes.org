@@ -13,7 +13,9 @@ import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True so a shell-exported DATABASE_URL/ANTHROPIC_API_KEY doesn't
+# shadow the value in .env (python-dotenv defaults to NOT overriding).
+load_dotenv(override=True)
 
 CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'VotingDataCSV.csv')
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schema.sql')

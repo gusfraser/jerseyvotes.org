@@ -11,7 +11,9 @@ import urllib.request
 import psycopg2
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True so a shell-exported DATABASE_URL/ANTHROPIC_API_KEY doesn't
+# shadow the value in .env (python-dotenv defaults to NOT overriding).
+load_dotenv(override=True)
 
 MODEL = 'gemma4:26b'
 

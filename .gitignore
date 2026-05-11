@@ -1,23 +1,81 @@
-# Python
+# ─── Python ────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 .venv/
 venv/
+env/
 *.egg-info/
+*.egg
+.eggs/
 
-# Environment
+# Dev tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+
+# Python build / dist
+build/
+dist/
+wheels/
+
+# ─── Environment / secrets ────────────────────────────────
 .env
-.env.local
-.env*.local
+.env.*
+!.env.example
+.envrc
 
-# Data files (too large for git)
+# ─── Data files ───────────────────────────────────────────
+# CSVs are mostly bulk data or generated outputs (PII risk).
+# Carve out the ones we actually want to commit as pipeline
+# config — add to this allowlist as new config CSVs appear.
 *.csv
 *.xml
+*.parquet
+*.tsv
+*.jsonl
+!pipeline/incumbent_overrides.csv
 
-# OS
+# Generated outputs from the pipeline that contain PII/tokens.
+# corrections.csv has every candidate's email + their private
+# correction_token URL — must never end up in git.
+corrections.csv
+pipeline/out/
+pipeline/output/
+
+# ─── Logs ─────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── OS ───────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# IDE
+# ─── Editors / IDE ────────────────────────────────────────
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.cursorignore
+
+# ─── Claude Code ─────────────────────────────────────────
+# Local user overrides — per-user settings shouldn't leak.
+# Keep .claude/launch.json (shared debug config) committed.
+.claude/settings.local.json
+.claude/*.local.json

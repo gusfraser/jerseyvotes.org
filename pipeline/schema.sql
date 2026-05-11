@@ -1,5 +1,9 @@
 -- AgenticGov Database Schema
 
+DROP TABLE IF EXISTS candidate_stances CASCADE;
+DROP TABLE IF EXISTS candidate_topics CASCADE;
+DROP TABLE IF EXISTS candidates CASCADE;
+DROP TABLE IF EXISTS canonical_questions CASCADE;
 DROP TABLE IF EXISTS votes CASCADE;
 DROP TABLE IF EXISTS vote_divisions CASCADE;
 DROP TABLE IF EXISTS propositions CASCADE;
@@ -67,3 +71,70 @@ CREATE INDEX idx_divisions_proposition ON vote_divisions(proposition_id);
 CREATE INDEX idx_propositions_year ON propositions(year);
 CREATE INDEX idx_propositions_topic ON propositions(topic_primary);
 CREATE INDEX idx_members_active ON members(is_currently_active);
+
+-- ---------------------------------------------------------------------------
+-- Candidates section (vote.je-sourced; forward-looking election content)
+-- ---------------------------------------------------------------------------
+
+-- One row per candidate scraped from vote.je
+CREATE TABLE candidates (
+    candidate_id SERIAL PRIMARY KEY,
+    vote_je_slug TEXT UNIQUE NOT NULL,         -- e.g. "steve-ahier-3"
+    profile_url TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    canonical_name TEXT,                       -- normalised for member matching
+    role TEXT,                                 -- Deputy / Connétable / Senator
+    constituency TEXT,                         -- district or parish
+    party TEXT,                                -- nullable; many run independent
+    photo_url TEXT,
+    email TEXT,
+    phone TEXT,
+    manifesto_text TEXT,                       -- raw scraped manifesto
+    manifesto_word_count INTEGER,
+    incumbent_member_id INTEGER REFERENCES members(member_id),
+    scrape_status TEXT DEFAULT 'pending',      -- pending/ok/low_content/error
+    scraped_at TIMESTAMPTZ DEFAULT NOW(),
+    classified_at TIMESTAMPTZ,
+    correction_token TEXT UNIQUE,
+    correction_state TEXT DEFAULT 'pending',   -- pending/reviewed/disputed
+    election_year INTEGER NOT NULL DEFAULT 2026
+);
+
+-- LLM-extracted topic coverage per candidate (uses the existing 16-cat taxonomy)
+CREATE TABLE candidate_topics (
+    candidate_id INTEGER REFERENCES candidates(candidate_id) ON DELETE CASCADE,
+    topic TEXT NOT NULL,                       -- matches propositions.topic_primary
+    salience NUMERIC(3,2),                     -- 0.00-1.00 share of manifesto
+    summary TEXT,                              -- LLM 1-sentence summary of position
+    source_quote TEXT,                         -- verbatim excerpt from manifesto
+    PRIMARY KEY (candidate_id, topic)
+);
+
+-- Canonical policy questions (versioned in code, mirrored to DB)
+CREATE TABLE canonical_questions (
+    question_id TEXT PRIMARY KEY,              -- e.g. "housing.affordable_target"
+    topic TEXT NOT NULL,                       -- matches existing 16-cat taxonomy
+    statement TEXT NOT NULL,                   -- agree/disagree statement
+    explainer TEXT,                            -- one-sentence context shown in UI
+    election_year INTEGER NOT NULL DEFAULT 2026,
+    sort_order INTEGER DEFAULT 0
+);
+
+-- Stance per candidate per canonical question
+CREATE TABLE candidate_stances (
+    candidate_id INTEGER REFERENCES candidates(candidate_id) ON DELETE CASCADE,
+    question_id TEXT REFERENCES canonical_questions(question_id) ON DELETE CASCADE,
+    stance TEXT NOT NULL,                      -- agree/disagree/neutral/not_addressed
+    confidence NUMERIC(3,2),                   -- LLM-reported 0.00-1.00
+    source_quote TEXT,                         -- verbatim excerpt (empty if not_addressed)
+    corrected_stance TEXT,                     -- if non-null, overrides stance (from candidate correction)
+    corrected_at TIMESTAMPTZ,
+    PRIMARY KEY (candidate_id, question_id)
+);
+
+CREATE INDEX idx_candidates_constituency ON candidates(constituency);
+CREATE INDEX idx_candidates_role ON candidates(role);
+CREATE INDEX idx_candidates_incumbent ON candidates(incumbent_member_id);
+CREATE INDEX idx_candidates_election_year ON candidates(election_year);
+CREATE INDEX idx_candidate_topics_topic ON candidate_topics(topic);
+CREATE INDEX idx_canonical_questions_topic ON canonical_questions(topic);

@@ -207,6 +207,19 @@ export default async function CandidatesPage({
           ))}
         </div>
       )}
+
+      {/* Contact footer — applies to questions about any candidate */}
+      <div className="mt-12 pt-6 border-t border-gray-200 dark:border-zinc-800 text-sm text-gray-600 dark:text-gray-400 text-center">
+        Spot an error on a candidate&rsquo;s page, or want to suggest an
+        improvement? Email{" "}
+        <a
+          href={`mailto:gus@helix.je?subject=${encodeURIComponent("Jersey Votes — candidate matcher")}`}
+          className="text-red-700 underline hover:no-underline"
+        >
+          gus@helix.je
+        </a>
+        . Most corrections processed within 24 hours.
+      </div>
     </div>
   );
 }

@@ -324,7 +324,11 @@ export default async function CandidateProfile({
       <p className="text-center text-sm text-gray-500 dark:text-gray-400">
         Spotted an error?{" "}
         <a
-          href="mailto:gus@blockchain.je?subject=Candidate correction"
+          href={`mailto:gus@helix.je?subject=${encodeURIComponent(
+            `Candidate correction: ${c.full_name}`
+          )}&body=${encodeURIComponent(
+            `Profile: https://jerseyvotes.org/candidates/${c.vote_je_slug}\n\nWhat's wrong (and what should it say)?\n\n`
+          )}`}
           className="underline hover:text-red-700"
         >
           Report it

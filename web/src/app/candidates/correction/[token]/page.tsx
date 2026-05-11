@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { CorrectionForm } from "./correction-form";
 
 // Token-gated preview. Crawlers must not index this.
 export const metadata: Metadata = {
@@ -81,13 +80,25 @@ export default async function CorrectionPreview({
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
         <p className="font-semibold text-amber-900 dark:text-amber-200 mb-1">
-          Private preview — not yet public
+          Your profile is live — please review
         </p>
         <p className="text-sm text-amber-800 dark:text-amber-300">
           This is a private review link for{" "}
-          <strong>{candidate.full_name}</strong>. Please check that the topics
-          and policy positions below correctly reflect your manifesto. If
-          anything is wrong, use the form at the bottom of this page to flag it.
+          <strong>{candidate.full_name}</strong>. Your public profile is
+          already live at{" "}
+          <a
+            href={`/candidates/${candidate.vote_je_slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-medium hover:no-underline"
+          >
+            jerseyvotes.org/candidates/{candidate.vote_je_slug}
+          </a>
+          . Please check that the topics and policy positions below correctly
+          reflect your manifesto. If anything is wrong, use the form at the
+          bottom of this page to flag it — we&rsquo;ll review and update
+          within 24 hours. This review page itself is unlisted and not
+          indexed by search engines.
         </p>
       </div>
 
@@ -179,12 +190,47 @@ export default async function CorrectionPreview({
         <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
           Flag a correction
         </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-          If we&rsquo;ve got something wrong, tell us specifically which topic
-          or statement and what should change. We process valid corrections
-          within 24 hours.
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          If we&rsquo;ve got something wrong, email Gus directly — tell us
+          specifically which topic or statement and what should change. Most
+          valid corrections are processed within 24 hours.
         </p>
-        <CorrectionForm token={token} />
+        {(() => {
+          const subject = `Candidate correction: ${candidate.full_name}`;
+          const body = [
+            `Profile: https://jerseyvotes.org/candidates/${candidate.vote_je_slug}`,
+            `Token: ${token}`,
+            ``,
+            `What's wrong, and what should it say?`,
+            ``,
+            `(Please be specific — e.g. "On the housing statement about binding affordable targets, my manifesto actually supports binding targets — see paragraph 3.")`,
+            ``,
+          ].join("\n");
+          const href = `mailto:gus@helix.je?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+          return (
+            <a
+              href={href}
+              className="inline-flex items-center gap-2 px-5 py-3 bg-red-700 text-white rounded-lg hover:bg-red-800 font-semibold text-sm"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Email correction to gus@helix.je
+            </a>
+          );
+        })()}
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+          The email opens with the profile link and a unique token already
+          filled in, so we can match your reply to this preview. Just add
+          your note and send.
+        </p>
       </section>
 
       <p className="text-xs text-gray-500 dark:text-gray-400">

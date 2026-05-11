@@ -384,21 +384,23 @@ export default async function MethodologyPage() {
       {/* Correction process */}
       <Section title="Candidate correction process">
         <Callout title="We are reaching out to candidates now">
-          With polling day close, we are in the process of contacting each
-          candidate with a private preview of how we&rsquo;ve classified their
-          positions, so they can flag any errors before the figures inform
-          anyone&rsquo;s vote. Until that outreach completes, treat the
-          published classifications as our best automated reading of the
+          The candidate classifications are live on the site, and we are
+          contacting each candidate with a private preview so they can flag
+          any errors before polling day. Until the candidate has responded,
+          treat the published figures as our best automated reading of the
           manifesto, not the candidate&rsquo;s own confirmed positions.
         </Callout>
         <Prose className="mt-5">
           <p>
-            Each candidate receives a unique token-gated preview link with a
-            short window to respond. After that window — and on an ongoing
-            basis after public launch — every candidate page has a
-            &ldquo;report an error&rdquo; link that goes straight to the
-            maintainer. We aim to process valid corrections within 24 hours
-            and timestamp the candidate&rsquo;s page accordingly.
+            Each candidate receives a unique token-gated preview link by email.
+            From that preview they can email{" "}
+            <ExternalLink href="mailto:gus@helix.je">gus@helix.je</ExternalLink>{" "}
+            with the profile link and token pre-filled — no form to sign up
+            for, no account to create. Every public candidate page also has a
+            &ldquo;Report it&rdquo; link that opens the same email flow with
+            the candidate&rsquo;s name pre-filled. We aim to process valid
+            corrections within 24 hours and timestamp the candidate&rsquo;s
+            page accordingly.
           </p>
           <p>
             When a correction overrides an LLM-extracted stance, the corrected
@@ -454,15 +456,31 @@ export default async function MethodologyPage() {
         </Prose>
       </Section>
 
-      <div className="mt-16 pt-8 border-t border-gray-200 dark:border-zinc-800 text-sm text-gray-500 dark:text-gray-400">
-        Questions or corrections?{" "}
+      <div className="mt-16 pt-8 border-t border-gray-200 dark:border-zinc-800">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+          Got a question, correction, or complaint?
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Email Gus directly. Candidates flagging an error about their own
+          profile, voters spotting a misclassification, or journalists with a
+          methodology question — all welcome to the same inbox.
+        </p>
         <a
-          href="mailto:gus@helix.je?subject=Candidate methodology"
-          className="text-red-700 hover:underline"
+          href={`mailto:gus@helix.je?subject=${encodeURIComponent("Jersey Votes — candidate matcher")}`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-md hover:bg-red-800 font-medium text-sm"
         >
-          Email the maintainer
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          gus@helix.je
         </a>
-        .
       </div>
     </div>
   );

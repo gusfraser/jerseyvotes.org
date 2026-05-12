@@ -25,6 +25,7 @@ import re
 import time
 from html import unescape
 
+import anthropic
 import httpx
 import psycopg2
 from dotenv import load_dotenv
@@ -34,12 +35,13 @@ load_dotenv(override=True)
 MODEL = 'claude-sonnet-4-5'
 FETCH_TIMEOUT = 20.0
 MAX_PAGE_CHARS = 200_000   # don't feed huge pages to the LLM
-EXTRACT_MAX_TOKENS = 4096
+EXTRACT_MAX_TOKENS = 16384
 BATCH_DELAY_SEC = 1.0
+RETRY_ATTEMPTS = 3
+RETRY_BACKOFF_SEC = (2.0, 5.0)
 
 SOURCE_LABELS = {
-    'personal_site', 'party_page', 'facebook', 'linkedin',
-    'news_interview', 'other',
+    'personal_site', 'party_page', 'facebook', 'linkedin', 'other',
 }
 
 FETCH_HEADERS = {
@@ -94,6 +96,45 @@ def final_text(resp) -> str:
     return '\n'.join(parts).strip()
 
 
+_TRANSIENT_API_ERRORS = (
+    anthropic.APIConnectionError,
+    anthropic.APITimeoutError,
+    anthropic.RateLimitError,
+    anthropic.InternalServerError,
+)
+
+
+def messages_create_with_retry(client, **kwargs):
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            return client.messages.create(**kwargs)
+        except _TRANSIENT_API_ERRORS as e:
+            if attempt == RETRY_ATTEMPTS - 1:
+                raise
+            delay = RETRY_BACKOFF_SEC[min(attempt, len(RETRY_BACKOFF_SEC) - 1)]
+            print(f'    transient API error (attempt {attempt+1}/{RETRY_ATTEMPTS}): '
+                  f'{type(e).__name__}; retrying in {delay}s')
+            time.sleep(delay)
+
+
+# Stream for calls that may take >2 min: non-streamed responses sit idle on the
+# socket while Sonnet generates, and consumer-grade middleboxes (NAT, ISP) close
+# the connection as idle. Streaming keeps bytes flowing every few hundred ms.
+def messages_stream_text_with_retry(client, **kwargs) -> str:
+    for attempt in range(RETRY_ATTEMPTS):
+        try:
+            with client.messages.stream(**kwargs) as stream:
+                parts = list(stream.text_stream)
+            return ''.join(parts).strip()
+        except _TRANSIENT_API_ERRORS as e:
+            if attempt == RETRY_ATTEMPTS - 1:
+                raise
+            delay = RETRY_BACKOFF_SEC[min(attempt, len(RETRY_BACKOFF_SEC) - 1)]
+            print(f'    transient API error (attempt {attempt+1}/{RETRY_ATTEMPTS}): '
+                  f'{type(e).__name__}; retrying in {delay}s')
+            time.sleep(delay)
+
+
 SEARCH_PROMPT = """You are helping a civic-transparency project find candidate manifestos for the 2026 Jersey States Assembly election (election day: 7 June 2026).
 
 Candidate: {name}
@@ -101,28 +142,29 @@ Role: {role}
 Constituency: {constituency}
 Party: {party}
 
-Use web_search to find the single best URL where THIS candidate (or their party on their behalf) publishes their platform / manifesto / policy positions for the 2026 election.
+Use web_search to find the single best URL where THIS candidate (or their party on their behalf) publishes their platform / manifesto / policy positions for the 2026 election. The source must be authored or controlled by the candidate or their party — not third-party reporting about them.
 
 Strongly prefer, in order:
   1. The candidate's personal campaign website
   2. The candidate's party's page for this candidate (e.g. Reform Jersey, Progress Party, Jersey Liberal Conservatives)
   3. A public Facebook page run by the candidate with a long pinned platform post
   4. A LinkedIn post by the candidate stating their platform
-  5. A long-form news interview where the candidate states their own positions at length
 
 Avoid:
   - vote.je (we already have that text)
   - Wikipedia
+  - News articles, profiles, or interviews (Jersey Evening Post, BBC, ITV, Bailiwick Express, etc.) — even when the candidate is quoted, the framing and selection is the journalist's, not the candidate's, so it isn't a fair comparison against candidates who weren't profiled
+  - Hustings coverage written by third parties
   - Third-party commentary that paraphrases rather than quotes the candidate
   - Generic party homepages that aren't about this specific candidate
 
-If you cannot find clearly candidate-owned content, return found=false.
+If you cannot find clearly candidate-owned content, return found=false. It is expected and fair for many candidates to have nothing beyond their vote.je page — do not stretch to fit a news source.
 
 Return ONLY a single JSON object (no markdown fences, no surrounding prose). Schema:
 {{
   "found": true | false,
   "url": "<string or null>",
-  "source_label": "personal_site" | "party_page" | "facebook" | "linkedin" | "news_interview" | "other" | null,
+  "source_label": "personal_site" | "party_page" | "facebook" | "linkedin" | "other" | null,
   "confidence": "low" | "medium" | "high",
   "note": "<one-sentence explanation of the source picked, or why no source was found>"
 }}"""
@@ -157,7 +199,8 @@ def find_source(client, name: str, role: str | None, constituency: str | None,
         constituency=constituency or 'unknown',
         party=party or 'Independent',
     )
-    resp = client.messages.create(
+    resp = messages_create_with_retry(
+        client,
         model=MODEL,
         max_tokens=1024,
         tools=[{
@@ -165,7 +208,7 @@ def find_source(client, name: str, role: str | None, constituency: str | None,
             'name': 'web_search',
             'max_uses': 5,
             'blocked_domains': ['vote.je', 'www.vote.je', 'en.wikipedia.org', 'wikipedia.org'],
-            'user_location': {'type': 'approximate', 'country': 'JE'},
+            'user_location': {'type': 'approximate', 'country': 'GB'},
         }],
         messages=[{'role': 'user', 'content': prompt}],
     )
@@ -211,12 +254,13 @@ def fetch_page(url: str) -> tuple[str, str] | None:
 
 def extract_manifesto(client, name: str, url: str, page_text: str) -> dict:
     prompt = EXTRACT_PROMPT.format(name=name, url=url, page_text=page_text)
-    resp = client.messages.create(
+    text_response = messages_stream_text_with_retry(
+        client,
         model=MODEL,
         max_tokens=EXTRACT_MAX_TOKENS,
         messages=[{'role': 'user', 'content': prompt}],
     )
-    data = parse_json_response(final_text(resp))
+    data = parse_json_response(text_response)
     text = (data.get('manifesto_text') or '').strip()
     note = (data.get('note') or '').strip()[:500]
     return {'manifesto_text': text, 'note': note}
@@ -264,11 +308,6 @@ def main():
     parser.add_argument('--name', type=str, default=None,
                         help='Process a single candidate by exact full_name (debugging)')
     args = parser.parse_args()
-
-    try:
-        import anthropic
-    except ImportError:
-        raise SystemExit('anthropic package not installed. pip install anthropic')
 
     conn = db_connect()
     cur = conn.cursor()

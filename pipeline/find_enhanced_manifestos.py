@@ -247,14 +247,22 @@ Page content (stripped to plain text):
 {links_block}
 Extract ONLY the candidate's own platform/policy statements, copying their wording verbatim. Skip site navigation, generic party boilerplate that isn't specific to this candidate, donate buttons, cookie banners, comments by other people, and unrelated news content.
 
-If the page above is a landing page / homepage / "about me" stub and the actual platform clearly lives at one of the internal links listed (e.g. /manifesto, /policies, /platform, /vision, /priorities), respond with that URL in `next_url` instead of extracting — we will fetch it and re-run extraction. Only set `next_url` when you are confident a listed link is the real manifesto destination; otherwise extract whatever platform content this page does contain.
+If the page above is a landing page / homepage / "about me" stub and the actual platform clearly lives at ONE of the internal links listed (e.g. /manifesto, /policies, /platform, /vision, /priorities), respond with that URL in `next_url` instead of extracting — we will fetch it and re-run extraction. Only set `next_url` when you are confident a listed link is the real manifesto destination; otherwise extract whatever platform content this page does contain.
+
+If the page lists multiple sub-pages that each contain one slice of the platform (e.g. /priorities/ listing /priorities/housing, /priorities/health, /priorities/economy; or /policies/ listing per-topic policy pages; or a "Core Themes" / "Manifesto" section listing per-topic links each on its own URL), respond with `aggregate_urls` set to the list of those sub-page URLs. We will fetch every URL in that list, concatenate the bodies, and re-run extraction over the combined text.
+
+This applies EVEN IF the current page has substantive teaser/intro text for each topic. A teaser like "A Fair Deal for Islanders — How Jersey creates wealth, shares risk..." with a link to /priorities/fair-deal/ is a signal to aggregate the full sub-pages, not to extract only the teaser. The candidate took the trouble to put each topic on its own page — extracting only the homepage teasers would underrepresent them.
+
+Use `aggregate_urls` only when the listed sub-pages are the same kind of thing (chapters of the candidate's own platform); do not include unrelated nav links, news posts, blog entries, or other candidates' pages. Cap at ~25 URLs.
+
+Pick at most one of `next_url` or `aggregate_urls`. If both could apply, prefer `aggregate_urls` for index/teaser pages and `next_url` for "click here for the manifesto" stubs.
 
 If the page does not actually contain platform/policy content for this candidate AND there is no obvious better link, leave the manifesto text section empty with a note explaining why.
 
 Output format (strict — no markdown fences, no surrounding prose):
 
   Line 1: a single-line JSON object with the small structured fields:
-    {{"next_url": <one URL from the internal links list, or null>, "note": "<one-sentence description>"}}
+    {{"next_url": <one URL from the internal links list, or null>, "aggregate_urls": [<URLs from the internal links list>] or null, "note": "<one-sentence description>"}}
 
   Line 2: the literal sentinel `{sentinel}` on its own line.
 
@@ -482,11 +490,18 @@ def _parse_extract_response(raw: str) -> dict:
         meta = parse_json_response(header) if header else {}
     except Exception:
         meta = {}
+    agg_raw = meta.get('aggregate_urls')
+    if not isinstance(agg_raw, list):
+        agg_raw = None
     return {
         'manifesto_text': body,
         'next_url': (meta.get('next_url') or None),
+        'aggregate_urls': agg_raw,
         'note': (meta.get('note') or '').strip()[:500],
     }
+
+
+AGGREGATE_URL_CAP = 25
 
 
 def extract_manifesto(client, name: str, url: str, page_text: str,
@@ -511,12 +526,30 @@ def extract_manifesto(client, name: str, url: str, page_text: str,
     next_url = data['next_url']
     if next_url is not None:
         next_url = str(next_url).strip() or None
-    # Only honour next_url if it was actually one of the links we offered, so a
+    # Only honour next_url / aggregate_urls if they were actually offered, so a
     # hallucinated URL or off-site redirect can't hijack the fetch.
     allowed = {l['url'] for l in (links or [])}
     if next_url and next_url not in allowed:
         next_url = None
-    return {'manifesto_text': text, 'next_url': next_url, 'note': data['note']}
+    aggregate_urls: list[str] = []
+    if data['aggregate_urls']:
+        seen: set[str] = set()
+        for u in data['aggregate_urls']:
+            u = (u or '').strip() if isinstance(u, str) else ''
+            if u and u in allowed and u not in seen:
+                seen.add(u)
+                aggregate_urls.append(u)
+                if len(aggregate_urls) >= AGGREGATE_URL_CAP:
+                    break
+    # Mutually exclusive in practice: prefer aggregate_urls for index pages.
+    if aggregate_urls:
+        next_url = None
+    return {
+        'manifesto_text': text,
+        'next_url': next_url,
+        'aggregate_urls': aggregate_urls,
+        'note': data['note'],
+    }
 
 
 class DB:
@@ -696,19 +729,31 @@ def main():
                     time.sleep(BATCH_DELAY_SEC)
                     continue
 
-                # Up to one drill-down hop: if the search step landed on a homepage and
-                # the model thinks the real manifesto is at a same-site link (validated
-                # against the offered list inside extract_manifesto), fetch that and
-                # re-extract. Capped at one hop so we can't loop.
+                # Up to MAX_NAVIGATIONS navigations away from the source URL:
+                # at each step the model can return next_url (drill once) or
+                # aggregate_urls (fetch many sub-pages and concatenate). 2
+                # navigations covers cases like bernardplace2026.com where the
+                # search lands on / and the platform is at /priorities/<topic>/
+                # (one drill from / to /priorities/, then aggregate the topic
+                # pages). After MAX_NAVIGATIONS, we accept whatever the extract
+                # produced even if it's still wanting to drill further.
+                MAX_NAVIGATIONS = 2
                 current_url = src['url']
                 current_page = page
                 hop_notes: list[str] = []
                 ext = None
-                for hop in range(2):
+                navigations = 0
+                aggregated_combined: str | None = None  # set if we ever ran aggregation
+                while True:
+                    # Once we've exhausted our navigation budget, stop offering
+                    # links — otherwise the model returns next_url/aggregate_urls
+                    # again instead of committing to extracting from the
+                    # synthetic combined doc.
+                    offer_links = current_page[2] if navigations < MAX_NAVIGATIONS else None
                     try:
                         ext = extract_manifesto(
                             client, name, current_url, current_page[1],
-                            links=current_page[2],
+                            links=offer_links,
                         )
                     except Exception as e:
                         print(f'  extract error: {e}')
@@ -720,21 +765,66 @@ def main():
                         ext = None
                         break
 
-                    if hop == 0 and ext['next_url'] and not ext['manifesto_text']:
+                    if ext['manifesto_text'] or navigations >= MAX_NAVIGATIONS:
+                        break
+
+                    if ext['next_url']:
                         print(f'  drilling -> {ext["next_url"]}')
                         hop_notes.append(f'hopped from {current_url} ({ext["note"]})')
                         next_page = fetch_page(browser, ext['next_url'])
                         if not next_page or not next_page[1]:
-                            print(f'    drill fetch_failed; keeping landing page extract')
-                            # Re-extract the landing page without offering next_url so
-                            # we get whatever content it does contain.
+                            print(f'    drill fetch_failed; keeping prior extract')
                             ext = extract_manifesto(
                                 client, name, current_url, current_page[1], links=None,
                             )
                             break
                         current_url = ext['next_url']
                         current_page = next_page
+                        navigations += 1
                         continue
+
+                    if ext['aggregate_urls']:
+                        agg = ext['aggregate_urls']
+                        print(f'  aggregating {len(agg)} sub-pages from {current_url}')
+                        hop_notes.append(f'aggregated {len(agg)} sub-pages from {current_url} ({ext["note"]})')
+                        parts: list[str] = []
+                        merged_links: list[dict] = []
+                        seen_link_urls: set[str] = set()
+                        ok = 0
+                        for sub_url in agg:
+                            sub_page = fetch_page(browser, sub_url)
+                            if not sub_page or not sub_page[1]:
+                                continue
+                            heading = urlparse(sub_url).path.rstrip('/').rsplit('/', 1)[-1] or sub_url
+                            parts.append(f'## {heading}\n\n{sub_page[1]}')
+                            ok += 1
+                            # Carry links from sub-pages forward — when the
+                            # aggregated page is itself an index (e.g. Bernard's
+                            # /priorities/ which lists /priorities/<topic>/),
+                            # the next extract needs to see the deeper links so
+                            # it can drill again on the next navigation.
+                            for l in sub_page[2]:
+                                if l['url'] not in seen_link_urls:
+                                    seen_link_urls.add(l['url'])
+                                    merged_links.append(l)
+                                    if len(merged_links) >= MAX_INTERNAL_LINKS:
+                                        break
+                            if len(merged_links) >= MAX_INTERNAL_LINKS:
+                                break
+                        if not parts:
+                            print(f'    aggregate fetch_failed for all sub-pages; keeping prior extract')
+                            ext = extract_manifesto(
+                                client, name, current_url, current_page[1], links=None,
+                            )
+                            break
+                        combined = '\n\n'.join(parts)[:MAX_PAGE_CHARS]
+                        hop_notes.append(f'fetched {ok}/{len(agg)} sub-pages')
+                        aggregated_combined = combined
+                        current_url = src['url']  # keep the index page as the canonical source
+                        current_page = ('html', combined, merged_links)
+                        navigations += 1
+                        continue
+
                     break
 
                 if ext is None:
@@ -742,6 +832,15 @@ def main():
                     continue
 
                 text = ext['manifesto_text']
+                # If we did aggregation work but the final extract came back
+                # empty (the model wanted to navigate further or got confused
+                # by the synthetic combined doc), fall back to the raw combined
+                # text. We'd rather store the aggregated bodies verbatim than
+                # throw away the fetches and call it empty.
+                if not text and aggregated_combined and len(aggregated_combined.split()) >= 200:
+                    print(f'  fallback: using raw aggregated text ({len(aggregated_combined.split())} words)')
+                    text = aggregated_combined
+                    hop_notes.append('used raw aggregated text (final extract was empty)')
                 wc = len(text.split()) if text else 0
                 notes_tail = ' | '.join([src['note'], *hop_notes, ext['note']])
                 if wc < 30:

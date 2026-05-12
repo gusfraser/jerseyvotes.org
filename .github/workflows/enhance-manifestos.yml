@@ -8,7 +8,7 @@ on:
         required: false
         default: ""
       name:
-        description: "Single candidate full_name (blank = batch mode)"
+        description: "Specific candidate(s) by exact full_name. Comma-separated for multiple, e.g. 'Bernard Place, Lyndon Farnham'. Blank = process all pending (or all rows if refind=true)."
         required: false
         default: ""
       refind:

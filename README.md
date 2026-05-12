@@ -94,6 +94,7 @@ pipeline/                           # Python data pipeline
 
   # Candidates pipeline (election-focused)
   scrape_candidates.py              # Fetch vote.je profiles → DB
+  find_enhanced_manifestos.py       # Web-search for fuller manifestos (Claude web_search)
   link_incumbents.py                # Match candidates to sitting members
   classify_candidates.py            # Sonnet topic + stance extraction
   generate_correction_previews.py   # Per-candidate outreach CSV
@@ -169,12 +170,20 @@ web/                                # Next.js app
 6. Run the candidates pipeline (once per election cycle, or to refresh):
    ```bash
    python pipeline/scrape_candidates.py        # ~30s, no API cost
+   python pipeline/find_enhanced_manifestos.py # Optional: web-search for fuller manifestos
    python pipeline/link_incumbents.py \
      --overrides pipeline/incumbent_overrides.csv
    python pipeline/classify_candidates.py      # ~60-90 min, ~$3.50 in Sonnet API
    python pipeline/generate_correction_previews.py \
      --host https://jerseyvotes.org > corrections.csv
    ```
+
+   `find_enhanced_manifestos.py` uses the Claude `web_search` server-side tool
+   to look up `"{candidate}" manifesto Jersey election 2026`, picks the
+   candidate-owned source (personal site, party page, public Facebook post),
+   and stores the verbatim text in `candidates.enhanced_manifesto_*`.
+   `classify_candidates.py` then prefers that text over the vote.je scrape;
+   the original `manifesto_text` is preserved untouched.
 
 7. Run the web app:
    ```bash

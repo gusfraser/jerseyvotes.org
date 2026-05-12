@@ -89,8 +89,18 @@ CREATE TABLE candidates (
     photo_url TEXT,
     email TEXT,
     phone TEXT,
-    manifesto_text TEXT,                       -- raw scraped manifesto
+    manifesto_text TEXT,                       -- raw scraped manifesto (vote.je)
     manifesto_word_count INTEGER,
+    -- Optional fuller manifesto sourced from the open web (personal site,
+    -- party page, public Facebook post). Populated by find_enhanced_manifestos.py.
+    -- classify_candidates.py prefers this over manifesto_text when present.
+    enhanced_manifesto_text TEXT,
+    enhanced_manifesto_source_url TEXT,
+    enhanced_manifesto_source_label TEXT,      -- personal_site/party_page/facebook/linkedin/news_interview/other
+    enhanced_manifesto_word_count INTEGER,
+    enhanced_manifesto_fetched_at TIMESTAMPTZ,
+    enhanced_manifesto_status TEXT DEFAULT 'pending',  -- pending/found/not_found/fetch_failed/empty/error
+    enhanced_manifesto_notes TEXT,
     incumbent_member_id INTEGER REFERENCES members(member_id),
     scrape_status TEXT DEFAULT 'pending',      -- pending/ok/low_content/error
     scraped_at TIMESTAMPTZ DEFAULT NOW(),
@@ -136,5 +146,6 @@ CREATE INDEX idx_candidates_constituency ON candidates(constituency);
 CREATE INDEX idx_candidates_role ON candidates(role);
 CREATE INDEX idx_candidates_incumbent ON candidates(incumbent_member_id);
 CREATE INDEX idx_candidates_election_year ON candidates(election_year);
+CREATE INDEX idx_candidates_enhanced_status ON candidates(enhanced_manifesto_status);
 CREATE INDEX idx_candidate_topics_topic ON candidate_topics(topic);
 CREATE INDEX idx_canonical_questions_topic ON canonical_questions(topic);

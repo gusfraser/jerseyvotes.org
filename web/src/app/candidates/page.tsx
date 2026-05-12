@@ -20,6 +20,7 @@ type CandidateRow = {
   scrape_status: string;
   classified_at: string | null;
   manifesto_word_count: number | null;
+  enhanced_manifesto_status: string | null;
   topics: string[] | null;
 };
 
@@ -54,7 +55,7 @@ export default async function CandidatesPage({
   const candidates = (await sql`
     SELECT c.candidate_id, c.vote_je_slug, c.full_name, c.role, c.constituency,
            c.party, c.photo_url, c.incumbent_member_id, c.scrape_status,
-           c.classified_at, c.manifesto_word_count,
+           c.classified_at, c.manifesto_word_count, c.enhanced_manifesto_status,
            ARRAY(
              SELECT topic FROM candidate_topics ct
              WHERE ct.candidate_id = c.candidate_id
@@ -259,7 +260,8 @@ function FilterSelect({
 
 function CandidateCard({ c }: { c: CandidateRow }) {
   const isIncumbent = c.incumbent_member_id !== null;
-  const isLowContent = c.scrape_status === "low_content";
+  const hasEnhanced = c.enhanced_manifesto_status === "found";
+  const isLowContent = c.scrape_status === "low_content" && !hasEnhanced;
   const topics = (c.topics ?? []).filter(Boolean);
 
   return (
@@ -310,6 +312,11 @@ function CandidateCard({ c }: { c: CandidateRow }) {
             {isLowContent && (
               <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">
                 Short manifesto
+              </span>
+            )}
+            {hasEnhanced && (
+              <span className="text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
+                Extended manifesto
               </span>
             )}
           </div>

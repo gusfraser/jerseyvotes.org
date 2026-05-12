@@ -1,0 +1,57 @@
+name: Enhance candidate manifestos
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max candidates to process (blank = all pending)"
+        required: false
+        default: ""
+      name:
+        description: "Single candidate full_name (blank = batch mode)"
+        required: false
+        default: ""
+      refind:
+        description: "Re-run candidates already marked found/not_found/error"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+concurrency:
+  group: enhance-manifestos
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run find_enhanced_manifestos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          args=()
+          if [ -n "${{ inputs.limit }}" ]; then
+            args+=(--limit "${{ inputs.limit }}")
+          fi
+          if [ -n "${{ inputs.name }}" ]; then
+            args+=(--name "${{ inputs.name }}")
+          fi
+          if [ "${{ inputs.refind }}" = "true" ]; then
+            args+=(--refind)
+          fi
+          echo "Running: python pipeline/find_enhanced_manifestos.py ${args[*]}"
+          python -u pipeline/find_enhanced_manifestos.py "${args[@]}"

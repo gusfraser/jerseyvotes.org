@@ -284,14 +284,26 @@ def main():
     cur.execute('SELECT question_id, topic, statement FROM canonical_questions ORDER BY sort_order')
     db_questions = [{'question_id': r[0], 'topic': r[1], 'statement': r[2]} for r in cur.fetchall()]
 
-    where = "WHERE scrape_status IN ('ok', 'low_content')"
+    # An enhanced manifesto found via find_enhanced_manifestos.py is preferred
+    # over the vote.je text, so a candidate is eligible if EITHER source has
+    # content. The COALESCE in the SELECT picks the richer one at read time.
+    where = """WHERE (scrape_status IN ('ok', 'low_content')
+                     OR (enhanced_manifesto_text IS NOT NULL
+                         AND enhanced_manifesto_text <> ''))"""
     if not args.reclassify:
-        where += ' AND classified_at IS NULL'
+        # Reprocess when never classified, OR when a newer enhanced manifesto
+        # has been fetched since the last classification.
+        where += """ AND (classified_at IS NULL
+                          OR (enhanced_manifesto_fetched_at IS NOT NULL
+                              AND enhanced_manifesto_fetched_at > classified_at))"""
     cur.execute(f'''
-        SELECT candidate_id, full_name, manifesto_text, manifesto_word_count
+        SELECT candidate_id, full_name,
+               COALESCE(NULLIF(enhanced_manifesto_text, ''), manifesto_text) AS manifesto,
+               COALESCE(NULLIF(enhanced_manifesto_word_count, 0),
+                        manifesto_word_count) AS wc
         FROM candidates
         {where}
-        ORDER BY manifesto_word_count DESC NULLS LAST
+        ORDER BY wc DESC NULLS LAST
     ''')
     rows = cur.fetchall()
     if args.limit:

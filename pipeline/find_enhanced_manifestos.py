@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import socket
 import time
 from html import unescape
 from urllib.parse import urljoin, urlparse
@@ -43,7 +44,17 @@ RETRY_BACKOFF_SEC = (2.0, 5.0)
 
 SOURCE_LABELS = {
     'personal_site', 'party_page', 'facebook', 'linkedin', 'other',
+    'party_manifesto',  # shared party-wide manifesto applied to every party member
 }
+
+REFORM_JERSEY_MANIFESTO_URL = 'https://www.reformjersey.je/manifesto'
+# Standard nav across every Reform Jersey page; we strip it from each chapter
+# body before concatenating so the combined manifesto isn't peppered with menu
+# repeats.
+REFORM_NAV_PREFIX_RE = re.compile(
+    r'^\s*(HOME\s*/\s*MANIFESTO\s*/\s*NEWS\s*/\s*EVENTS\s*/\s*JOIN\s*/\s*CONTACT\s*/?\s*)+',
+    re.IGNORECASE,
+)
 
 FETCH_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
@@ -223,6 +234,7 @@ Return ONLY a single JSON object (no markdown fences, no surrounding prose). Sch
 }}"""
 
 
+EXTRACT_SENTINEL = '---MANIFESTO-TEXT-FOLLOWS---'
 EXTRACT_PROMPT = """You are extracting a Jersey election candidate's platform/manifesto from a web page.
 
 Candidate: {name}
@@ -237,14 +249,21 @@ Extract ONLY the candidate's own platform/policy statements, copying their wordi
 
 If the page above is a landing page / homepage / "about me" stub and the actual platform clearly lives at one of the internal links listed (e.g. /manifesto, /policies, /platform, /vision, /priorities), respond with that URL in `next_url` instead of extracting — we will fetch it and re-run extraction. Only set `next_url` when you are confident a listed link is the real manifesto destination; otherwise extract whatever platform content this page does contain.
 
-If the page does not actually contain platform/policy content for this candidate AND there is no obvious better link, return manifesto_text as an empty string with a note explaining why.
+If the page does not actually contain platform/policy content for this candidate AND there is no obvious better link, leave the manifesto text section empty with a note explaining why.
 
-Return ONLY a single JSON object (no markdown fences, no surrounding prose). Schema:
-{{
-  "manifesto_text": "<verbatim extracted text; may be empty>",
-  "next_url": "<one URL from the internal links list, or null>",
-  "note": "<one-sentence description of what was extracted, why next_url was picked, or why nothing was found>"
-}}"""
+Output format (strict — no markdown fences, no surrounding prose):
+
+  Line 1: a single-line JSON object with the small structured fields:
+    {{"next_url": <one URL from the internal links list, or null>, "note": "<one-sentence description>"}}
+
+  Line 2: the literal sentinel `{sentinel}` on its own line.
+
+  Lines 3+: the verbatim manifesto text (or nothing if there is none). May contain
+  any characters including newlines and quotes — no escaping needed because we
+  read everything after the sentinel as raw text.
+
+This format means you do not need to escape quotes, newlines, or control characters
+in the manifesto text — just paste it after the sentinel as-is."""
 
 
 def find_source(client, name: str, role: str | None, constituency: str | None,
@@ -294,6 +313,81 @@ PLAYWRIGHT_SETTLE_MS = 3000   # let client-rendered content paint after DOMConte
 CHALLENGE_RETRY_MS = 6000
 CHALLENGE_MARKERS = ('checking your browser', 'just a moment', 'cf-browser-verification',
                      'attention required')
+
+
+def fetch_reform_manifesto(browser) -> tuple[str, str] | None:
+    """Reform Jersey publishes their manifesto as a multi-page set on
+    reformjersey.je: the /manifesto landing is just a table of contents that
+    links out to chapter pages like /Foreword, /Key Pledges, /Healthcare and
+    Wellbeing, etc. Fetch the landing, follow each chapter link, strip the
+    repeated nav header from each body, and concatenate. Returns
+    (combined_text, note) or None on failure."""
+    landing = fetch_page(browser, REFORM_JERSEY_MANIFESTO_URL)
+    if not landing or not landing[1]:
+        return None
+
+    # Heuristic: chapter URLs use Title Case slugs ('/Foreword', '/Key Pledges')
+    # while nav and per-candidate pages are lowercase ('/home', '/carinaalves').
+    # Plus exclude /pages, /documents, the manifesto landing itself.
+    chapter_links: list[dict] = []
+    seen_paths: set[str] = set()
+    for link in landing[2]:
+        path = urlparse(link['url']).path
+        if not path or path == '/' or path in seen_paths:
+            continue
+        if path.lower() in ('/manifesto',):
+            continue
+        if path.lower().startswith(('/pages/', '/documents/')):
+            continue
+        # Title-case marker: any uppercase letter after the leading slash, or a
+        # space in the path. Catches '/Foreword' and '/Key Pledges' but excludes
+        # '/carinaalves', '/agreement2018', '/newdeal'.
+        slug = path[1:]
+        if not (' ' in slug or '%20' in slug or any(c.isupper() for c in slug)):
+            continue
+        seen_paths.add(path)
+        chapter_links.append(link)
+
+    if not chapter_links:
+        return None
+
+    print(f'[setup] aggregating {len(chapter_links)} Reform manifesto chapters')
+    parts: list[str] = []
+    chapters_ok = 0
+    for link in chapter_links:
+        page = fetch_page(browser, link['url'])
+        if not page or not page[1]:
+            continue
+        body = REFORM_NAV_PREFIX_RE.sub('', page[1]).strip()
+        # Drop the chapter title duplicated as the first line if it matches the
+        # link text — it'll be re-emitted as our heading line below.
+        if body.lower().startswith(link['text'].lower()):
+            body = body[len(link['text']):].lstrip(' /\n')
+        parts.append(f'## {link["text"]}\n\n{body}')
+        chapters_ok += 1
+
+    if not parts:
+        return None
+    combined = '\n\n'.join(parts)[:MAX_PAGE_CHARS]
+    note = (f'Aggregated {chapters_ok}/{len(chapter_links)} chapter pages from '
+            f'{REFORM_JERSEY_MANIFESTO_URL}')
+    return combined, note
+
+
+def host_resolves(url: str) -> bool:
+    """Check whether the URL's hostname has a DNS record. The search step
+    occasionally hallucinates plausible-sounding domains (marklabey.com,
+    mikejackson.je, richardvibert.je in our last batch) that don't exist;
+    catching them here saves a Playwright launch and gives a clean
+    not_found status instead of fetch_failed."""
+    host = urlparse(url).hostname
+    if not host:
+        return False
+    try:
+        socket.getaddrinfo(host, None)
+        return True
+    except (socket.gaierror, OSError):
+        return False
 
 
 def _httpx_pdf_probe(url: str) -> bool:
@@ -371,6 +465,30 @@ def fetch_page(browser, url: str) -> tuple[str, str, list[dict]] | None:
     return ('html', body[:MAX_PAGE_CHARS], links)
 
 
+def _parse_extract_response(raw: str) -> dict:
+    """Split the model's response on EXTRACT_SENTINEL: header is one-line JSON
+    with next_url + note; body is raw verbatim manifesto text. Avoids the
+    JSON-with-embedded-newlines class of parse failures."""
+    raw = raw.strip()
+    if EXTRACT_SENTINEL in raw:
+        header, _, body = raw.partition(EXTRACT_SENTINEL)
+    else:
+        # Fallback: no sentinel emitted (older prompt or model drift). Treat
+        # the whole thing as a JSON header with no body.
+        header, body = raw, ''
+    header = header.strip()
+    body = body.strip()
+    try:
+        meta = parse_json_response(header) if header else {}
+    except Exception:
+        meta = {}
+    return {
+        'manifesto_text': body,
+        'next_url': (meta.get('next_url') or None),
+        'note': (meta.get('note') or '').strip()[:500],
+    }
+
+
 def extract_manifesto(client, name: str, url: str, page_text: str,
                       links: list[dict] | None = None) -> dict:
     if links:
@@ -380,6 +498,7 @@ def extract_manifesto(client, name: str, url: str, page_text: str,
         links_block = '\n'
     prompt = EXTRACT_PROMPT.format(
         name=name, url=url, page_text=page_text, links_block=links_block,
+        sentinel=EXTRACT_SENTINEL,
     )
     text_response = messages_stream_text_with_retry(
         client,
@@ -387,27 +506,52 @@ def extract_manifesto(client, name: str, url: str, page_text: str,
         max_tokens=EXTRACT_MAX_TOKENS,
         messages=[{'role': 'user', 'content': prompt}],
     )
-    data = parse_json_response(text_response)
-    text = (data.get('manifesto_text') or '').strip()
-    next_url = (data.get('next_url') or '').strip() or None
+    data = _parse_extract_response(text_response)
+    text = data['manifesto_text']
+    next_url = data['next_url']
+    if next_url is not None:
+        next_url = str(next_url).strip() or None
     # Only honour next_url if it was actually one of the links we offered, so a
     # hallucinated URL or off-site redirect can't hijack the fetch.
     allowed = {l['url'] for l in (links or [])}
     if next_url and next_url not in allowed:
         next_url = None
-    note = (data.get('note') or '').strip()[:500]
-    return {'manifesto_text': text, 'next_url': next_url, 'note': note}
+    return {'manifesto_text': text, 'next_url': next_url, 'note': data['note']}
 
 
-def update_candidate(cur, conn, cand_id: int, *,
+class DB:
+    """Auto-reconnecting wrapper. Long extract calls (>10 minutes for the
+    aggregated Reform manifesto, multi-minute for any large page) leave the
+    Postgres connection idle long enough that Neon's pooler closes it. The
+    next write fails with `SSL connection has been closed unexpectedly`."""
+
+    def __init__(self):
+        self.conn = db_connect()
+        self.cur = self.conn.cursor()
+
+    def reconnect(self):
+        try: self.cur.close()
+        except Exception: pass
+        try: self.conn.close()
+        except Exception: pass
+        self.conn = db_connect()
+        self.cur = self.conn.cursor()
+
+    def close(self):
+        try: self.cur.close()
+        except Exception: pass
+        try: self.conn.close()
+        except Exception: pass
+
+
+def update_candidate(db: DB, cand_id: int, *,
                      status: str,
                      text: str | None = None,
                      word_count: int | None = None,
                      source_url: str | None = None,
                      source_label: str | None = None,
                      notes: str | None = None):
-    cur.execute(
-        '''
+    sql = '''
         UPDATE candidates SET
             enhanced_manifesto_status = %(status)s,
             enhanced_manifesto_text = %(text)s,
@@ -418,18 +562,22 @@ def update_candidate(cur, conn, cand_id: int, *,
             enhanced_manifesto_fetched_at = CASE WHEN %(status)s = 'found' THEN NOW()
                                                  ELSE enhanced_manifesto_fetched_at END
         WHERE candidate_id = %(cid)s
-        ''',
-        {
-            'status': status,
-            'text': text,
-            'wc': word_count,
-            'url': source_url,
-            'label': source_label,
-            'notes': (notes or '')[:1000],
-            'cid': cand_id,
-        },
-    )
-    conn.commit()
+    '''
+    params = {
+        'status': status, 'text': text, 'wc': word_count,
+        'url': source_url, 'label': source_label,
+        'notes': (notes or '')[:1000], 'cid': cand_id,
+    }
+    for attempt in range(2):
+        try:
+            db.cur.execute(sql, params)
+            db.conn.commit()
+            return
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            if attempt == 1:
+                raise
+            print(f'    DB write failed ({type(e).__name__}); reconnecting')
+            db.reconnect()
 
 
 def main():
@@ -442,8 +590,7 @@ def main():
                         help='Process a single candidate by exact full_name (debugging)')
     args = parser.parse_args()
 
-    conn = db_connect()
-    cur = conn.cursor()
+    db = DB()
 
     where = 'WHERE election_year = %s'
     params: list = [args.election_year]
@@ -453,7 +600,7 @@ def main():
     elif not args.refind:
         where += " AND (enhanced_manifesto_status IS NULL OR enhanced_manifesto_status = 'pending')"
 
-    cur.execute(
+    db.cur.execute(
         f'''
         SELECT candidate_id, full_name, role, constituency, party
         FROM candidates
@@ -462,7 +609,7 @@ def main():
         ''',
         params,
     )
-    rows = cur.fetchall()
+    rows = db.cur.fetchall()
     if args.limit:
         rows = rows[: args.limit]
     print(f'Processing {len(rows)} candidates')
@@ -476,13 +623,42 @@ def main():
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         try:
+            # Reform Jersey publishes a single party manifesto that covers every
+            # member candidate. Fetch it once and apply to all Reform candidates
+            # in this batch — saves search/extract calls and avoids the search
+            # step landing on per-candidate stub pages with thin content.
+            reform_text, reform_note = None, None
+            if any((p or '').lower() == 'reform jersey' for *_, p in rows):
+                print(f'[setup] fetching shared Reform Jersey manifesto')
+                rj = fetch_reform_manifesto(browser)
+                if rj:
+                    reform_text, reform_note = rj
+                    print(f'[setup] Reform manifesto: {len(reform_text.split())} words')
+                else:
+                    print(f'[setup] Reform manifesto aggregation failed')
+
             for i, (cand_id, name, role, constituency, party) in enumerate(rows):
                 print(f'[{i+1}/{len(rows)}] {name}')
+
+                # Reform Jersey candidates: apply the shared party manifesto and
+                # skip the per-candidate search/fetch pipeline entirely.
+                if (party or '').lower() == 'reform jersey' and reform_text:
+                    wc = len(reform_text.split())
+                    print(f'  reform party manifesto ({wc} words) -> {REFORM_JERSEY_MANIFESTO_URL}')
+                    update_candidate(db, cand_id, status='found',
+                                     text=reform_text, word_count=wc,
+                                     source_url=REFORM_JERSEY_MANIFESTO_URL,
+                                     source_label='party_manifesto',
+                                     notes=f'Applied shared Reform Jersey party manifesto. '
+                                           f'{reform_note or ""}')
+                    found_n += 1
+                    continue
+
                 try:
                     src = find_source(client, name, role, constituency, party)
                 except Exception as e:
                     print(f'  search error: {e}')
-                    update_candidate(cur, conn, cand_id, status='error',
+                    update_candidate(db, cand_id, status='error',
                                      notes=f'search error: {e}')
                     err_n += 1
                     time.sleep(2.0)
@@ -490,8 +666,20 @@ def main():
 
                 if not src['found'] or not src['url']:
                     print(f'  not_found: {src["note"]}')
-                    update_candidate(cur, conn, cand_id, status='not_found',
+                    update_candidate(db, cand_id, status='not_found',
                                      notes=src['note'])
+                    miss_n += 1
+                    time.sleep(BATCH_DELAY_SEC)
+                    continue
+
+                # DNS pre-check: search step occasionally invents domains. Skip
+                # the Playwright launch when the host doesn't resolve.
+                if not host_resolves(src['url']):
+                    print(f'  not_found (dns): {src["url"]}')
+                    update_candidate(db, cand_id, status='not_found',
+                                     source_url=src['url'],
+                                     source_label=src['source_label'],
+                                     notes=f'{src["note"]} | host did not resolve')
                     miss_n += 1
                     time.sleep(BATCH_DELAY_SEC)
                     continue
@@ -500,7 +688,7 @@ def main():
                 if not page or not page[1]:
                     kind = page[0] if page else 'no-response'
                     print(f'  fetch_failed ({kind}): {src["url"]}')
-                    update_candidate(cur, conn, cand_id, status='fetch_failed',
+                    update_candidate(db, cand_id, status='fetch_failed',
                                      source_url=src['url'],
                                      source_label=src['source_label'],
                                      notes=f'{src["note"]} | fetch_failed: {kind}')
@@ -524,7 +712,7 @@ def main():
                         )
                     except Exception as e:
                         print(f'  extract error: {e}')
-                        update_candidate(cur, conn, cand_id, status='error',
+                        update_candidate(db, cand_id, status='error',
                                          source_url=current_url,
                                          source_label=src['source_label'],
                                          notes=f'{src["note"]} | extract error: {e}')
@@ -558,14 +746,14 @@ def main():
                 notes_tail = ' | '.join([src['note'], *hop_notes, ext['note']])
                 if wc < 30:
                     print(f'  empty ({wc} words): {ext["note"]}')
-                    update_candidate(cur, conn, cand_id, status='empty',
+                    update_candidate(db, cand_id, status='empty',
                                      source_url=current_url,
                                      source_label=src['source_label'],
                                      notes=notes_tail)
                     miss_n += 1
                 else:
                     print(f'  found ({wc} words) -> {current_url}')
-                    update_candidate(cur, conn, cand_id, status='found',
+                    update_candidate(db, cand_id, status='found',
                                      text=text, word_count=wc,
                                      source_url=current_url,
                                      source_label=src['source_label'],
@@ -577,8 +765,7 @@ def main():
         finally:
             browser.close()
 
-    cur.close()
-    conn.close()
+    db.close()
     print(f'\nDone. found={found_n}, not_found={miss_n}, errors={err_n}')
 
 

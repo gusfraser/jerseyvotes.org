@@ -17,12 +17,27 @@ type CandidateFull = {
   email: string | null;
   manifesto_text: string | null;
   manifesto_word_count: number | null;
+  enhanced_manifesto_text: string | null;
+  enhanced_manifesto_source_url: string | null;
+  enhanced_manifesto_source_label: string | null;
+  enhanced_manifesto_word_count: number | null;
+  enhanced_manifesto_fetched_at: string | null;
+  enhanced_manifesto_status: string | null;
   incumbent_member_id: number | null;
   incumbent_canonical_name: string | null;
   incumbent_display_name: string | null;
   scrape_status: string;
   scraped_at: string;
   classified_at: string | null;
+};
+
+const ENHANCED_SOURCE_LABELS: Record<string, string> = {
+  personal_site: "Personal site",
+  party_page: "Party page",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  news_interview: "News interview",
+  other: "Web source",
 };
 
 type TopicRow = {
@@ -113,6 +128,14 @@ export default async function CandidateProfile({
   const isIncumbent = c.incumbent_member_id !== null;
   const isLowContent = c.scrape_status === "low_content";
   const isClassified = c.classified_at !== null;
+  const hasEnhanced =
+    c.enhanced_manifesto_status === "found" &&
+    !!c.enhanced_manifesto_text &&
+    !!c.enhanced_manifesto_source_url;
+  const enhancedSourceLabel = hasEnhanced
+    ? ENHANCED_SOURCE_LABELS[c.enhanced_manifesto_source_label ?? "other"] ??
+      "Web source"
+    : null;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -176,9 +199,14 @@ export default async function CandidateProfile({
                   Incumbent · see voting record &rarr;
                 </Link>
               )}
-              {isLowContent && (
+              {isLowContent && !hasEnhanced && (
                 <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded">
                   Short manifesto ({c.manifesto_word_count ?? 0} words)
+                </span>
+              )}
+              {hasEnhanced && (
+                <span className="text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded">
+                  Extended manifesto ({c.enhanced_manifesto_word_count ?? 0} words)
                 </span>
               )}
               {!isClassified && (
@@ -196,6 +224,19 @@ export default async function CandidateProfile({
               >
                 Source profile on vote.je &rarr;
               </a>
+              {hasEnhanced && c.enhanced_manifesto_source_url && (
+                <>
+                  <span className="mx-2">·</span>
+                  <a
+                    href={c.enhanced_manifesto_source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-red-700"
+                  >
+                    {enhancedSourceLabel} (extended) &rarr;
+                  </a>
+                </>
+              )}
               {c.email && (
                 <>
                   <span className="mx-2">·</span>
@@ -302,33 +343,101 @@ export default async function CandidateProfile({
         </section>
       )}
 
-      {/* Full manifesto */}
-      {c.manifesto_text && (
+      {/* Full manifesto. When we have an enhanced (web-sourced) manifesto we
+          show it as primary because the topic + stance classification on this
+          page is derived from it — readers need to see the same text the
+          source_quote excerpts came from. The original vote.je listing stays
+          available in a collapsed block underneath. */}
+      {(c.enhanced_manifesto_text || c.manifesto_text) && (
         <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
           <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
             Full manifesto
           </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Scraped from{" "}
-            <a
-              href={c.profile_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-red-700"
-            >
-              vote.je
-            </a>{" "}
-            on{" "}
-            {new Date(c.scraped_at).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-            .
-          </p>
-          <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-            {c.manifesto_text}
-          </div>
+          {hasEnhanced && c.enhanced_manifesto_source_url ? (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Extended platform sourced from{" "}
+                <a
+                  href={c.enhanced_manifesto_source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-red-700"
+                >
+                  {enhancedSourceLabel}
+                </a>
+                {c.enhanced_manifesto_fetched_at && (
+                  <>
+                    {" "}
+                    on{" "}
+                    {new Date(
+                      c.enhanced_manifesto_fetched_at,
+                    ).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </>
+                )}
+                . The topic and stance analysis above is derived from this text.
+              </p>
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                {c.enhanced_manifesto_text}
+              </div>
+              {c.manifesto_text && (
+                <details className="mt-6 border-t border-gray-100 dark:border-zinc-800 pt-4">
+                  <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-red-700">
+                    Show original vote.je listing ({c.manifesto_word_count ?? 0}{" "}
+                    words)
+                  </summary>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 mb-3">
+                    Scraped from{" "}
+                    <a
+                      href={c.profile_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-red-700"
+                    >
+                      vote.je
+                    </a>{" "}
+                    on{" "}
+                    {new Date(c.scraped_at).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                    .
+                  </p>
+                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-600 dark:text-gray-400">
+                    {c.manifesto_text}
+                  </div>
+                </details>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                Scraped from{" "}
+                <a
+                  href={c.profile_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-red-700"
+                >
+                  vote.je
+                </a>{" "}
+                on{" "}
+                {new Date(c.scraped_at).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+                .
+              </p>
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                {c.manifesto_text}
+              </div>
+            </>
+          )}
         </section>
       )}
 

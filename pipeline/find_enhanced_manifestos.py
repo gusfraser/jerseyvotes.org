@@ -24,6 +24,7 @@ import os
 import re
 import time
 from html import unescape
+from urllib.parse import urljoin, urlparse
 
 import anthropic
 import httpx
@@ -58,6 +59,58 @@ def db_connect():
         keepalives=1, keepalives_idle=30, keepalives_interval=10,
         keepalives_count=5, connect_timeout=15,
     )
+
+
+MAX_INTERNAL_LINKS = 40
+LINK_TEXT_MAX = 80
+
+
+def _same_site(host_a: str, host_b: str) -> bool:
+    a = (host_a or '').lower().lstrip('.')
+    b = (host_b or '').lower().lstrip('.')
+    if a.startswith('www.'): a = a[4:]
+    if b.startswith('www.'): b = b[4:]
+    return bool(a) and bool(b) and (a == b or a.endswith('.' + b) or b.endswith('.' + a))
+
+
+def extract_internal_links(html: str, base_url: str) -> list[dict]:
+    """Pull <a href> links on the same registrable site as base_url. Returns a
+    deduped, capped list of {text, url} dicts in document order. Used to let
+    the extractor drill into /manifesto, /policies etc. when the search step
+    landed on a homepage."""
+    base_host = urlparse(base_url).hostname or ''
+    seen: set[str] = set()
+    out: list[dict] = []
+    for m in re.finditer(
+        r'<a\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        html, flags=re.DOTALL | re.IGNORECASE,
+    ):
+        href = m.group(1).strip()
+        if not href or href.startswith(('#', 'mailto:', 'tel:', 'javascript:')):
+            continue
+        try:
+            absolute = urljoin(base_url, href)
+        except Exception:
+            continue
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ('http', 'https'):
+            continue
+        if not _same_site(parsed.hostname or '', base_host):
+            continue
+        # Drop fragment so /policies and /policies#x dedupe to the same entry
+        clean = parsed._replace(fragment='').geturl()
+        if clean == base_url or clean in seen:
+            continue
+        # Cheap inner-text strip — good enough for the model to recognise links
+        text = re.sub(r'<[^>]+>', ' ', m.group(2))
+        text = re.sub(r'\s+', ' ', unescape(text)).strip()[:LINK_TEXT_MAX]
+        if not text:
+            continue
+        seen.add(clean)
+        out.append({'text': text, 'url': clean})
+        if len(out) >= MAX_INTERNAL_LINKS:
+            break
+    return out
 
 
 def strip_tags(html: str) -> str:
@@ -179,15 +232,18 @@ Page content (stripped to plain text):
 \"\"\"
 {page_text}
 \"\"\"
-
+{links_block}
 Extract ONLY the candidate's own platform/policy statements, copying their wording verbatim. Skip site navigation, generic party boilerplate that isn't specific to this candidate, donate buttons, cookie banners, comments by other people, and unrelated news content.
 
-If the page does not actually contain platform/policy content for this candidate, return manifesto_text as an empty string with a note explaining why.
+If the page above is a landing page / homepage / "about me" stub and the actual platform clearly lives at one of the internal links listed (e.g. /manifesto, /policies, /platform, /vision, /priorities), respond with that URL in `next_url` instead of extracting — we will fetch it and re-run extraction. Only set `next_url` when you are confident a listed link is the real manifesto destination; otherwise extract whatever platform content this page does contain.
+
+If the page does not actually contain platform/policy content for this candidate AND there is no obvious better link, return manifesto_text as an empty string with a note explaining why.
 
 Return ONLY a single JSON object (no markdown fences, no surrounding prose). Schema:
 {{
   "manifesto_text": "<verbatim extracted text; may be empty>",
-  "note": "<one-sentence description of what was extracted or why nothing was>"
+  "next_url": "<one URL from the internal links list, or null>",
+  "note": "<one-sentence description of what was extracted, why next_url was picked, or why nothing was found>"
 }}"""
 
 
@@ -230,8 +286,11 @@ def find_source(client, name: str, role: str | None, constituency: str | None,
     }
 
 
-def fetch_page(url: str) -> tuple[str, str] | None:
-    """Return (kind, text) where kind is 'html'|'text'|'pdf', or None on failure."""
+def fetch_page(url: str) -> tuple[str, str, list[dict]] | None:
+    """Return (kind, text, links) where kind is 'html'|'text'|'pdf'.
+    links is the list of same-site <a href> targets (empty for non-HTML),
+    used by extract_manifesto to drill one hop deeper when the page is a
+    landing page rather than the manifesto itself. Returns None on failure."""
     try:
         with httpx.Client(timeout=FETCH_TIMEOUT, follow_redirects=True,
                           headers=FETCH_HEADERS) as c:
@@ -242,18 +301,32 @@ def fetch_page(url: str) -> tuple[str, str] | None:
     if r.status_code >= 400:
         print(f'    HTTP {r.status_code}')
         return None
+    final_url = str(r.url)
     ctype = (r.headers.get('content-type') or '').lower()
     if 'pdf' in ctype or url.lower().endswith('.pdf'):
         # We don't extract PDFs in this iteration; a future pass can use pdftotext.
-        return ('pdf', '')
-    body = r.text
-    if '<html' in body[:2048].lower() or '<body' in body[:2048].lower() or 'html' in ctype:
-        body = strip_tags(body)
-    return ('html' if 'html' in ctype else 'text', body[:MAX_PAGE_CHARS])
+        return ('pdf', '', [])
+    raw = r.text
+    is_html = 'html' in ctype or '<html' in raw[:2048].lower() or '<body' in raw[:2048].lower()
+    if is_html:
+        links = extract_internal_links(raw, final_url)
+        body = strip_tags(raw)
+    else:
+        links = []
+        body = raw
+    return ('html' if is_html else 'text', body[:MAX_PAGE_CHARS], links)
 
 
-def extract_manifesto(client, name: str, url: str, page_text: str) -> dict:
-    prompt = EXTRACT_PROMPT.format(name=name, url=url, page_text=page_text)
+def extract_manifesto(client, name: str, url: str, page_text: str,
+                      links: list[dict] | None = None) -> dict:
+    if links:
+        rendered = '\n'.join(f'  - {l["text"]} -> {l["url"]}' for l in links)
+        links_block = f'\nInternal links found on this page (same site only):\n{rendered}\n'
+    else:
+        links_block = '\n'
+    prompt = EXTRACT_PROMPT.format(
+        name=name, url=url, page_text=page_text, links_block=links_block,
+    )
     text_response = messages_stream_text_with_retry(
         client,
         model=MODEL,
@@ -262,8 +335,14 @@ def extract_manifesto(client, name: str, url: str, page_text: str) -> dict:
     )
     data = parse_json_response(text_response)
     text = (data.get('manifesto_text') or '').strip()
+    next_url = (data.get('next_url') or '').strip() or None
+    # Only honour next_url if it was actually one of the links we offered, so a
+    # hallucinated URL or off-site redirect can't hijack the fetch.
+    allowed = {l['url'] for l in (links or [])}
+    if next_url and next_url not in allowed:
+        next_url = None
     note = (data.get('note') or '').strip()[:500]
-    return {'manifesto_text': text, 'note': note}
+    return {'manifesto_text': text, 'next_url': next_url, 'note': note}
 
 
 def update_candidate(cur, conn, cand_id: int, *,
@@ -369,35 +448,69 @@ def main():
             time.sleep(BATCH_DELAY_SEC)
             continue
 
-        try:
-            ext = extract_manifesto(client, name, src['url'], page[1])
-        except Exception as e:
-            print(f'  extract error: {e}')
-            update_candidate(cur, conn, cand_id, status='error',
-                             source_url=src['url'],
-                             source_label=src['source_label'],
-                             notes=f'{src["note"]} | extract error: {e}')
-            err_n += 1
+        # Up to one drill-down hop: if the search step landed on a homepage and
+        # the model thinks the real manifesto is at a same-site link (validated
+        # against the offered list inside extract_manifesto), fetch that and
+        # re-extract. Capped at one hop so we can't loop.
+        current_url = src['url']
+        current_page = page
+        hop_notes: list[str] = []
+        ext = None
+        for hop in range(2):
+            try:
+                ext = extract_manifesto(
+                    client, name, current_url, current_page[1],
+                    links=current_page[2],
+                )
+            except Exception as e:
+                print(f'  extract error: {e}')
+                update_candidate(cur, conn, cand_id, status='error',
+                                 source_url=current_url,
+                                 source_label=src['source_label'],
+                                 notes=f'{src["note"]} | extract error: {e}')
+                err_n += 1
+                ext = None
+                break
+
+            if hop == 0 and ext['next_url'] and not ext['manifesto_text']:
+                print(f'  drilling -> {ext["next_url"]}')
+                hop_notes.append(f'hopped from {current_url} ({ext["note"]})')
+                next_page = fetch_page(ext['next_url'])
+                if not next_page or not next_page[1]:
+                    print(f'    drill fetch_failed; keeping landing page extract')
+                    # Re-extract the landing page without offering next_url so
+                    # we get whatever content it does contain.
+                    ext = extract_manifesto(
+                        client, name, current_url, current_page[1], links=None,
+                    )
+                    break
+                current_url = ext['next_url']
+                current_page = next_page
+                continue
+            break
+
+        if ext is None:
             time.sleep(2.0)
             continue
 
         text = ext['manifesto_text']
         wc = len(text.split()) if text else 0
+        notes_tail = ' | '.join([src['note'], *hop_notes, ext['note']])
         if wc < 30:
             print(f'  empty ({wc} words): {ext["note"]}')
             update_candidate(cur, conn, cand_id, status='empty',
-                             source_url=src['url'],
+                             source_url=current_url,
                              source_label=src['source_label'],
-                             notes=f'{src["note"]} | {ext["note"]}')
+                             notes=notes_tail)
             miss_n += 1
         else:
-            print(f'  found ({wc} words) -> {src["url"]}')
+            print(f'  found ({wc} words) -> {current_url}')
             update_candidate(cur, conn, cand_id, status='found',
                              text=text, word_count=wc,
-                             source_url=src['url'],
+                             source_url=current_url,
                              source_label=src['source_label'],
                              notes=f'{src["source_label"]}/{src["confidence"]} | '
-                                   f'{src["note"]} | {ext["note"]}')
+                                   f'{notes_tail}')
             found_n += 1
 
         time.sleep(BATCH_DELAY_SEC)

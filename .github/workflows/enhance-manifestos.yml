@@ -38,6 +38,9 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Install Playwright browsers
+        run: python -m playwright install --with-deps chromium
+
       - name: Run find_enhanced_manifestos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

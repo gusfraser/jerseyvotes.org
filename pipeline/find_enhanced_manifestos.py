@@ -286,35 +286,89 @@ def find_source(client, name: str, role: str | None, constituency: str | None,
     }
 
 
-def fetch_page(url: str) -> tuple[str, str, list[dict]] | None:
-    """Return (kind, text, links) where kind is 'html'|'text'|'pdf'.
-    links is the list of same-site <a href> targets (empty for non-HTML),
-    used by extract_manifesto to drill one hop deeper when the page is a
-    landing page rather than the manifesto itself. Returns None on failure."""
+PLAYWRIGHT_NAV_TIMEOUT_MS = 25_000
+PLAYWRIGHT_SETTLE_MS = 3000   # let client-rendered content paint after DOMContentLoaded
+# Sites behind a Cloudflare/wp.com browser-check show "Checking your browser..."
+# for several seconds before the real page paints. If the rendered text matches
+# this pattern after the initial settle, wait again and retry the read.
+CHALLENGE_RETRY_MS = 6000
+CHALLENGE_MARKERS = ('checking your browser', 'just a moment', 'cf-browser-verification',
+                     'attention required')
+
+
+def _httpx_pdf_probe(url: str) -> bool:
+    """Cheap content-type check so we don't fire up the browser for a PDF."""
+    if url.lower().endswith('.pdf'):
+        return True
     try:
-        with httpx.Client(timeout=FETCH_TIMEOUT, follow_redirects=True,
-                          headers=FETCH_HEADERS) as c:
-            r = c.get(url)
+        with httpx.Client(timeout=10.0, follow_redirects=True, headers=FETCH_HEADERS) as c:
+            r = c.head(url)
+        return 'pdf' in (r.headers.get('content-type') or '').lower()
+    except Exception:
+        return False
+
+
+def fetch_page(browser, url: str) -> tuple[str, str, list[dict]] | None:
+    """Return (kind, text, links) where kind is 'html'|'pdf'. Renders the page
+    with Playwright (Chromium) so JS-built sites — Reform Jersey's page builder,
+    SPA campaign sites, lyndonfarnham.je's /manifesto-2/ — actually populate
+    before we read them. Returns None on failure.
+
+    links is the list of same-site <a href> targets pulled from the *rendered*
+    DOM, used by extract_manifesto to drill one hop deeper when the page is a
+    landing page rather than the manifesto itself."""
+    if _httpx_pdf_probe(url):
+        # PDFs are out of scope for this pass; a later iteration can pdftotext them.
+        return ('pdf', '', [])
+
+    from playwright.sync_api import Error as PWError, TimeoutError as PWTimeout
+
+    context = browser.new_context(
+        user_agent=FETCH_HEADERS['User-Agent'],
+        locale='en-GB',
+        viewport={'width': 1280, 'height': 1800},
+    )
+    page = context.new_page()
+    try:
+        try:
+            # domcontentloaded over networkidle — analytics/ads pixels keep
+            # many candidate sites from ever reaching idle, and we'd rather
+            # take the rendered DOM after a fixed settle than time out.
+            page.goto(url, wait_until='domcontentloaded', timeout=PLAYWRIGHT_NAV_TIMEOUT_MS)
+        except PWTimeout:
+            print('    nav timeout; continuing with whatever rendered')
+        page.wait_for_timeout(PLAYWRIGHT_SETTLE_MS)
+
+        def _read():
+            html = page.content()
+            try:
+                visible = page.locator('body').inner_text(timeout=5_000)
+            except (PWTimeout, PWError):
+                visible = strip_tags(html)
+            return html, visible
+
+        rendered_html, visible_text = _read()
+        if any(m in visible_text.lower() for m in CHALLENGE_MARKERS):
+            print('    bot challenge detected; waiting longer')
+            page.wait_for_timeout(CHALLENGE_RETRY_MS)
+            rendered_html, visible_text = _read()
+        final_url = page.url
     except Exception as e:
         print(f'    fetch error: {e}')
+        try:
+            context.close()
+        except Exception:
+            pass
         return None
-    if r.status_code >= 400:
-        print(f'    HTTP {r.status_code}')
-        return None
-    final_url = str(r.url)
-    ctype = (r.headers.get('content-type') or '').lower()
-    if 'pdf' in ctype or url.lower().endswith('.pdf'):
-        # We don't extract PDFs in this iteration; a future pass can use pdftotext.
-        return ('pdf', '', [])
-    raw = r.text
-    is_html = 'html' in ctype or '<html' in raw[:2048].lower() or '<body' in raw[:2048].lower()
-    if is_html:
-        links = extract_internal_links(raw, final_url)
-        body = strip_tags(raw)
-    else:
-        links = []
-        body = raw
-    return ('html' if is_html else 'text', body[:MAX_PAGE_CHARS], links)
+    finally:
+        try:
+            context.close()
+        except Exception:
+            pass
+
+    links = extract_internal_links(rendered_html, final_url)
+    body = re.sub(r'\n{3,}', '\n\n', visible_text).strip()
+    return ('html', body[:MAX_PAGE_CHARS], links)
 
 
 def extract_manifesto(client, name: str, url: str, page_text: str,
@@ -416,104 +470,112 @@ def main():
     client = anthropic.Anthropic()
     found_n, miss_n, err_n = 0, 0, 0
 
-    for i, (cand_id, name, role, constituency, party) in enumerate(rows):
-        print(f'[{i+1}/{len(rows)}] {name}')
+    # One headless Chromium for the whole run — launching per-candidate would
+    # add ~1s of overhead per page and exhaust the runner's file descriptors.
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
         try:
-            src = find_source(client, name, role, constituency, party)
-        except Exception as e:
-            print(f'  search error: {e}')
-            update_candidate(cur, conn, cand_id, status='error',
-                             notes=f'search error: {e}')
-            err_n += 1
-            time.sleep(2.0)
-            continue
+            for i, (cand_id, name, role, constituency, party) in enumerate(rows):
+                print(f'[{i+1}/{len(rows)}] {name}')
+                try:
+                    src = find_source(client, name, role, constituency, party)
+                except Exception as e:
+                    print(f'  search error: {e}')
+                    update_candidate(cur, conn, cand_id, status='error',
+                                     notes=f'search error: {e}')
+                    err_n += 1
+                    time.sleep(2.0)
+                    continue
 
-        if not src['found'] or not src['url']:
-            print(f'  not_found: {src["note"]}')
-            update_candidate(cur, conn, cand_id, status='not_found',
-                             notes=src['note'])
-            miss_n += 1
-            time.sleep(BATCH_DELAY_SEC)
-            continue
+                if not src['found'] or not src['url']:
+                    print(f'  not_found: {src["note"]}')
+                    update_candidate(cur, conn, cand_id, status='not_found',
+                                     notes=src['note'])
+                    miss_n += 1
+                    time.sleep(BATCH_DELAY_SEC)
+                    continue
 
-        page = fetch_page(src['url'])
-        if not page or not page[1]:
-            kind = page[0] if page else 'no-response'
-            print(f'  fetch_failed ({kind}): {src["url"]}')
-            update_candidate(cur, conn, cand_id, status='fetch_failed',
-                             source_url=src['url'],
-                             source_label=src['source_label'],
-                             notes=f'{src["note"]} | fetch_failed: {kind}')
-            err_n += 1
-            time.sleep(BATCH_DELAY_SEC)
-            continue
+                page = fetch_page(browser, src['url'])
+                if not page or not page[1]:
+                    kind = page[0] if page else 'no-response'
+                    print(f'  fetch_failed ({kind}): {src["url"]}')
+                    update_candidate(cur, conn, cand_id, status='fetch_failed',
+                                     source_url=src['url'],
+                                     source_label=src['source_label'],
+                                     notes=f'{src["note"]} | fetch_failed: {kind}')
+                    err_n += 1
+                    time.sleep(BATCH_DELAY_SEC)
+                    continue
 
-        # Up to one drill-down hop: if the search step landed on a homepage and
-        # the model thinks the real manifesto is at a same-site link (validated
-        # against the offered list inside extract_manifesto), fetch that and
-        # re-extract. Capped at one hop so we can't loop.
-        current_url = src['url']
-        current_page = page
-        hop_notes: list[str] = []
-        ext = None
-        for hop in range(2):
-            try:
-                ext = extract_manifesto(
-                    client, name, current_url, current_page[1],
-                    links=current_page[2],
-                )
-            except Exception as e:
-                print(f'  extract error: {e}')
-                update_candidate(cur, conn, cand_id, status='error',
-                                 source_url=current_url,
-                                 source_label=src['source_label'],
-                                 notes=f'{src["note"]} | extract error: {e}')
-                err_n += 1
+                # Up to one drill-down hop: if the search step landed on a homepage and
+                # the model thinks the real manifesto is at a same-site link (validated
+                # against the offered list inside extract_manifesto), fetch that and
+                # re-extract. Capped at one hop so we can't loop.
+                current_url = src['url']
+                current_page = page
+                hop_notes: list[str] = []
                 ext = None
-                break
+                for hop in range(2):
+                    try:
+                        ext = extract_manifesto(
+                            client, name, current_url, current_page[1],
+                            links=current_page[2],
+                        )
+                    except Exception as e:
+                        print(f'  extract error: {e}')
+                        update_candidate(cur, conn, cand_id, status='error',
+                                         source_url=current_url,
+                                         source_label=src['source_label'],
+                                         notes=f'{src["note"]} | extract error: {e}')
+                        err_n += 1
+                        ext = None
+                        break
 
-            if hop == 0 and ext['next_url'] and not ext['manifesto_text']:
-                print(f'  drilling -> {ext["next_url"]}')
-                hop_notes.append(f'hopped from {current_url} ({ext["note"]})')
-                next_page = fetch_page(ext['next_url'])
-                if not next_page or not next_page[1]:
-                    print(f'    drill fetch_failed; keeping landing page extract')
-                    # Re-extract the landing page without offering next_url so
-                    # we get whatever content it does contain.
-                    ext = extract_manifesto(
-                        client, name, current_url, current_page[1], links=None,
-                    )
+                    if hop == 0 and ext['next_url'] and not ext['manifesto_text']:
+                        print(f'  drilling -> {ext["next_url"]}')
+                        hop_notes.append(f'hopped from {current_url} ({ext["note"]})')
+                        next_page = fetch_page(browser, ext['next_url'])
+                        if not next_page or not next_page[1]:
+                            print(f'    drill fetch_failed; keeping landing page extract')
+                            # Re-extract the landing page without offering next_url so
+                            # we get whatever content it does contain.
+                            ext = extract_manifesto(
+                                client, name, current_url, current_page[1], links=None,
+                            )
+                            break
+                        current_url = ext['next_url']
+                        current_page = next_page
+                        continue
                     break
-                current_url = ext['next_url']
-                current_page = next_page
-                continue
-            break
 
-        if ext is None:
-            time.sleep(2.0)
-            continue
+                if ext is None:
+                    time.sleep(2.0)
+                    continue
 
-        text = ext['manifesto_text']
-        wc = len(text.split()) if text else 0
-        notes_tail = ' | '.join([src['note'], *hop_notes, ext['note']])
-        if wc < 30:
-            print(f'  empty ({wc} words): {ext["note"]}')
-            update_candidate(cur, conn, cand_id, status='empty',
-                             source_url=current_url,
-                             source_label=src['source_label'],
-                             notes=notes_tail)
-            miss_n += 1
-        else:
-            print(f'  found ({wc} words) -> {current_url}')
-            update_candidate(cur, conn, cand_id, status='found',
-                             text=text, word_count=wc,
-                             source_url=current_url,
-                             source_label=src['source_label'],
-                             notes=f'{src["source_label"]}/{src["confidence"]} | '
-                                   f'{notes_tail}')
-            found_n += 1
+                text = ext['manifesto_text']
+                wc = len(text.split()) if text else 0
+                notes_tail = ' | '.join([src['note'], *hop_notes, ext['note']])
+                if wc < 30:
+                    print(f'  empty ({wc} words): {ext["note"]}')
+                    update_candidate(cur, conn, cand_id, status='empty',
+                                     source_url=current_url,
+                                     source_label=src['source_label'],
+                                     notes=notes_tail)
+                    miss_n += 1
+                else:
+                    print(f'  found ({wc} words) -> {current_url}')
+                    update_candidate(cur, conn, cand_id, status='found',
+                                     text=text, word_count=wc,
+                                     source_url=current_url,
+                                     source_label=src['source_label'],
+                                     notes=f'{src["source_label"]}/{src["confidence"]} | '
+                                           f'{notes_tail}')
+                    found_n += 1
 
-        time.sleep(BATCH_DELAY_SEC)
+                time.sleep(BATCH_DELAY_SEC)
+        finally:
+            browser.close()
 
     cur.close()
     conn.close()

@@ -620,16 +620,27 @@ def main():
                         help='Reprocess even candidates already searched')
     parser.add_argument('--election-year', type=int, default=2026)
     parser.add_argument('--name', type=str, default=None,
-                        help='Process a single candidate by exact full_name (debugging)')
+                        help='Process specific candidates by exact full_name. '
+                             'Comma- or newline-separated for multiple, e.g. '
+                             '--name "Alex Curtis, Bernard Place". Implies --refind.')
     args = parser.parse_args()
 
     db = DB()
 
+    # --name can be a single name, comma-separated, or newline-separated (the
+    # latter so a workflow_dispatch multi-line input pastes through cleanly).
+    requested_names: list[str] = []
+    if args.name:
+        for chunk in re.split(r'[,\n]', args.name):
+            chunk = chunk.strip()
+            if chunk:
+                requested_names.append(chunk)
+
     where = 'WHERE election_year = %s'
     params: list = [args.election_year]
-    if args.name:
-        where += ' AND full_name = %s'
-        params.append(args.name)
+    if requested_names:
+        where += ' AND full_name = ANY(%s)'
+        params.append(requested_names)
     elif not args.refind:
         where += " AND (enhanced_manifesto_status IS NULL OR enhanced_manifesto_status = 'pending')"
 
@@ -645,6 +656,11 @@ def main():
     rows = db.cur.fetchall()
     if args.limit:
         rows = rows[: args.limit]
+    if requested_names:
+        matched = {r[1] for r in rows}
+        missing = [n for n in requested_names if n not in matched]
+        if missing:
+            print(f'Warning: no candidate row matched: {", ".join(missing)}')
     print(f'Processing {len(rows)} candidates')
 
     client = anthropic.Anthropic()

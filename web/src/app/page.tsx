@@ -2,6 +2,11 @@ import Link from "next/link";
 import { sql, daysUntilElection } from "@/lib/db";
 import { TrackedLink } from "@/lib/track-click";
 
+// Force a fresh render at least hourly so the "X days until you vote" hero
+// doesn't get frozen to the build-time value. Without this, Next 16 static-
+// generates the whole page and the countdown stops moving until next deploy.
+export const revalidate = 3600;
+
 const JERSEY_CONSTITUENCIES = [
   // 12 parishes (Connétable)
   "St Helier",

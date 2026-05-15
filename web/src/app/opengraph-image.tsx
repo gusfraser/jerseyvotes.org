@@ -2,6 +2,11 @@ import { ImageResponse } from "next/og";
 import { daysUntilElection } from "@/lib/db";
 
 export const runtime = "edge";
+// OG images are statically optimized by default. force-dynamic is the only
+// opt-out that works under edge runtime (the `revalidate` export is ignored
+// there per Next 16 docs) — without it the "X days until you vote" headline
+// stays pinned to whatever the build-time value was.
+export const dynamic = "force-dynamic";
 export const alt = "Jersey Votes — Find your candidate for the 2026 election";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

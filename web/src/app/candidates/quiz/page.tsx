@@ -9,6 +9,10 @@ export const metadata: Metadata = {
     "Rank your priorities and answer policy questions to see which 2026 Jersey election candidates best match your views. Every score is transparent and traceable to manifesto quotes.",
 };
 
+// Re-render at least hourly so the "days until polling day" header stays
+// current. See web/src/app/page.tsx for the same rationale.
+export const revalidate = 3600;
+
 export default function CandidateQuizPage() {
   const days = daysUntilElection();
   return (

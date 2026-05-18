@@ -13,6 +13,13 @@ const STANCE_BLEND = 0.6;
 // Threshold below which we mark the result as "low confidence" in the UI.
 const LOW_COVERAGE_THRESHOLD = 0.4;
 
+// Sample-size threshold for the stance score. If the user and candidate
+// overlapped on fewer than this many questions, S is pro-rated linearly
+// (full credit only at >= this count). Stops a candidate who happens to
+// agree on a single tangential question from getting S=100% and ranking
+// above candidates with substantive coverage.
+const STANCE_FULL_CREDIT_AT = 8;
+
 type UserAnswer = "agree" | "disagree" | "neutral" | "skip";
 
 type ScoreInput = {
@@ -195,6 +202,9 @@ export async function POST(request: Request) {
       let sDen = 0;
       let matchedQuestions = 0;
       let totalUserQuestions = 0;
+      // Count of overlap questions (both user and candidate took a position
+      // we could compare). Used for sample-size shrinkage of S below.
+      let overlapCount = 0;
       for (const [qid, userAns] of Object.entries(userAnswers)) {
         const candidateStance = candStances.get(qid);
         if (!candidateStance) continue;
@@ -227,10 +237,18 @@ export async function POST(request: Request) {
           // off-priority issue.
           sNum += w * matched;
           sDen += w;
+          overlapCount++;
           if (matched === 1) matchedQuestions++;
         }
       }
-      const S = sDen > 0 ? sNum / sDen : 0;
+      const rawS = sDen > 0 ? sNum / sDen : 0;
+      // Sample-size shrinkage. If only 1 question overlapped, even a perfect
+      // agreement is unreliable; pro-rate linearly up to STANCE_FULL_CREDIT_AT.
+      // Without this, a candidate who matched on 1 tangential question with
+      // 100% agreement gets the same S as one with 100% across 15 questions —
+      // see /candidates/methodology for the full explanation.
+      const sampleSizeFactor = Math.min(1, overlapCount / STANCE_FULL_CREDIT_AT);
+      const S = rawS * sampleSizeFactor;
 
       // C: coverage on user's priority topics
       const candidateAddressedOnPriorities = [...candStances.entries()].filter(
@@ -259,17 +277,24 @@ export async function POST(request: Request) {
         scrape_status: c.scrape_status,
         T: round2(T),
         S: round2(S),
+        S_raw: round2(rawS),
         C: round2(C),
         match: round2(match),
         matched_questions: matchedQuestions,
         answered_questions: totalUserQuestions,
+        overlap_count: overlapCount,
+        full_credit_at: STANCE_FULL_CREDIT_AT,
         low_coverage: C < LOW_COVERAGE_THRESHOLD,
       };
     });
 
-  // Sort by match desc, then by S desc, then alphabetical (no false precision
-  // tiebreaks). We expose Math.round(match*100) so 0.001 differences don't ranks.
+  // Tiered sort: high-coverage candidates first (sorted by match), then
+  // low-coverage candidates (also sorted by match). This stops a candidate
+  // with C=0 from ranking above someone who actually addressed the user's
+  // priorities. We expose Math.round(match*100) for the ranking key so 0.1%
+  // differences don't drive tiebreaks.
   results.sort((a, b) => {
+    if (a.low_coverage !== b.low_coverage) return a.low_coverage ? 1 : -1;
     const ma = Math.round(a.match * 100);
     const mb = Math.round(b.match * 100);
     if (mb !== ma) return mb - ma;
@@ -277,14 +302,18 @@ export async function POST(request: Request) {
     return a.name.localeCompare(b.name);
   });
 
+  const strongMatchCount = results.filter((r) => !r.low_coverage).length;
+
   return NextResponse.json({
     results,
     priorities,
     constituency,
+    strongMatchCount,
     config: {
       rankWeights: RANK_WEIGHTS,
       blend: { topic: TOPIC_BLEND, stance: STANCE_BLEND },
       lowCoverageThreshold: LOW_COVERAGE_THRESHOLD,
+      stanceFullCreditAt: STANCE_FULL_CREDIT_AT,
     },
   });
 }

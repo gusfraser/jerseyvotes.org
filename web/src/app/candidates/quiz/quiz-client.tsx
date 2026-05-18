@@ -33,10 +33,13 @@ type Result = {
   scrape_status: string;
   T: number;
   S: number;
+  S_raw: number;
   C: number;
   match: number;
   matched_questions: number;
   answered_questions: number;
+  overlap_count: number;
+  full_credit_at: number;
   low_coverage: boolean;
 };
 
@@ -44,6 +47,7 @@ type ResultsPayload = {
   results: Result[];
   priorities: string[];
   constituency: string | null;
+  strongMatchCount: number;
 };
 
 const STORAGE_KEY = "jv-candidate-quiz-v1";
@@ -803,7 +807,13 @@ function ResultsView({
   payload: ResultsPayload;
   onRetake: () => void;
 }) {
-  const top = payload.results[0];
+  const strongMatches = payload.results.filter((r) => !r.low_coverage);
+  const lowCoverageMatches = payload.results.filter((r) => r.low_coverage);
+  // The "top match" hero is only meaningful if we have a strong-coverage match.
+  // Without that, the hero would be amplifying a noisy result — so we show a
+  // different message instead.
+  const top = strongMatches[0] ?? null;
+
   return (
     <div>
       {top ? (
@@ -839,13 +849,18 @@ function ResultsView({
             of your answers matched
           </p>
           <BreakdownTriple T={top.T} S={top.S} C={top.C} className="mt-4 justify-center" />
-          {top.low_coverage && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 max-w-md mx-auto">
-              <strong>Low coverage:</strong> this candidate&rsquo;s manifesto
-              didn&rsquo;t address most of your priority areas. The score is
-              based on limited information.
-            </p>
-          )}
+        </div>
+      ) : payload.results.length > 0 ? (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl p-6 mb-6">
+          <p className="font-semibold mb-1 text-amber-900 dark:text-amber-200">
+            No strong matches yet
+          </p>
+          <p className="text-sm text-amber-900/90 dark:text-amber-200/90">
+            None of the candidates you can vote for took substantive positions on
+            most of your priority topics. The list below shows our best guess
+            with limited information — see each candidate&rsquo;s page for the
+            full manifesto and the topics they actually addressed.
+          </p>
         </div>
       ) : (
         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl p-6">
@@ -856,87 +871,57 @@ function ResultsView({
         </div>
       )}
 
-      <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
-        All candidates ranked
-      </h2>
-      <div className="space-y-2">
-        {payload.results.map((r, i) => (
-          <Link
-            key={r.candidate_id}
-            href={`/candidates/${r.slug}`}
-            onClick={() =>
-              trackEvent("candidate_quiz_result_clicked", {
-                rank: i + 1,
-                slug: r.slug,
-                name: r.name,
-                match_pct: Math.round(r.match * 100),
-                from: "ranked_list",
-              })
-            }
-            className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-3 hover:border-red-300 transition-colors"
-          >
-            <span className="w-6 text-right text-sm font-bold text-gray-400">
-              {i + 1}
+      {strongMatches.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              Strong matches
+            </h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {strongMatches.length} candidate{strongMatches.length === 1 ? "" : "s"}{" "}
+              who addressed your priorities
             </span>
-            <div className="w-10 h-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-zinc-800">
-              {r.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={r.photo_url}
-                  alt={r.name}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  {r.name.charAt(0)}
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
-                {r.name}
-                {r.is_incumbent && (
-                  <span className="ml-2 text-[10px] bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded">
-                    Incumbent
-                  </span>
-                )}
-                {r.low_coverage && (
-                  <span className="ml-2 text-[10px] bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">
-                    Low coverage
-                  </span>
-                )}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {[
-                  r.role,
-                  r.constituency ?? (r.role === "Senator" ? "island-wide" : null),
-                  r.party,
-                ]
-                  .filter(Boolean)
-                  .join(" — ")}
-              </p>
-            </div>
-            <div className="text-right">
-              <p
-                className={`text-lg font-bold ${
-                  r.match >= 0.7
-                    ? "text-green-600"
-                    : r.match >= 0.5
-                    ? "text-amber-600"
-                    : "text-red-600"
-                }`}
-              >
-                {Math.round(r.match * 100)}%
-              </p>
-              <p className="text-[10px] text-gray-400">
-                T {Math.round(r.T * 100)} · S {Math.round(r.S * 100)} · C{" "}
-                {Math.round(r.C * 100)}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+          </div>
+          <div className="space-y-2 mb-8">
+            {strongMatches.map((r, i) => (
+              <CandidateResultRow
+                key={r.candidate_id}
+                r={r}
+                rank={i + 1}
+                tier="strong"
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {lowCoverageMatches.length > 0 && (
+        <>
+          <div className="flex items-baseline justify-between mb-2 mt-4">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              Limited information
+            </h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {lowCoverageMatches.length} candidate{lowCoverageMatches.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+            These candidates didn&rsquo;t address most of your priority topics in
+            their published manifesto. The score is based on limited information,
+            not necessarily disagreement &mdash; treat with caution.
+          </p>
+          <div className="space-y-2">
+            {lowCoverageMatches.map((r, i) => (
+              <CandidateResultRow
+                key={r.candidate_id}
+                r={r}
+                rank={strongMatches.length + i + 1}
+                tier="low"
+              />
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="mt-8 text-center">
         <button
@@ -959,6 +944,91 @@ function ResultsView({
         </p>
       </div>
     </div>
+  );
+}
+
+function CandidateResultRow({
+  r,
+  rank,
+  tier,
+}: {
+  r: Result;
+  rank: number;
+  tier: "strong" | "low";
+}) {
+  return (
+    <Link
+      href={`/candidates/${r.slug}`}
+      onClick={() =>
+        trackEvent("candidate_quiz_result_clicked", {
+          rank,
+          slug: r.slug,
+          name: r.name,
+          match_pct: Math.round(r.match * 100),
+          from: tier === "strong" ? "strong_matches" : "low_coverage",
+        })
+      }
+      className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+        tier === "low"
+          ? "bg-gray-50 dark:bg-zinc-950 border-gray-200 dark:border-zinc-800 opacity-90 hover:opacity-100 hover:border-amber-300"
+          : "bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 hover:border-red-300"
+      }`}
+    >
+      <span className="w-6 text-right text-sm font-bold text-gray-400">{rank}</span>
+      <div className="w-10 h-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-zinc-800">
+        {r.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={r.photo_url} alt={r.name} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400">
+            {r.name.charAt(0)}
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-900 dark:text-gray-100 truncate text-sm">
+          {r.name}
+          {r.is_incumbent && (
+            <span className="ml-2 text-[10px] bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded">
+              Incumbent
+            </span>
+          )}
+          {tier === "low" && (
+            <span className="ml-2 text-[10px] bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">
+              Low coverage
+            </span>
+          )}
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+          {[r.role, r.constituency ?? (r.role === "Senator" ? "island-wide" : null), r.party]
+            .filter(Boolean)
+            .join(" — ")}
+        </p>
+      </div>
+      <div className="text-right">
+        <p
+          className={`text-lg font-bold ${
+            tier === "low"
+              ? "text-gray-500"
+              : r.match >= 0.7
+              ? "text-green-600"
+              : r.match >= 0.5
+              ? "text-amber-600"
+              : "text-red-600"
+          }`}
+        >
+          {Math.round(r.match * 100)}%
+        </p>
+        <p className="text-[10px] text-gray-400">
+          T {Math.round(r.T * 100)} · S {Math.round(r.S * 100)} · C {Math.round(r.C * 100)}
+        </p>
+        {r.overlap_count < r.full_credit_at && r.overlap_count > 0 && (
+          <p className="text-[10px] text-gray-400">
+            on {r.overlap_count}/{r.full_credit_at} questions
+          </p>
+        )}
+      </div>
+    </Link>
   );
 }
 

@@ -350,16 +350,46 @@ export default async function MethodologyPage() {
           <Formula
             numerator="Σ over matched_q ( topic_weight[topic(q)] × match[q] )"
             denominator="Σ over matched_q ( topic_weight[topic(q)] )"
-            label="S(c)"
+            label="S_raw(c)"
           />
+          <Prose className="mt-3">
+            <p>
+              <strong>Sample-size shrinkage.</strong> A candidate who happens
+              to match on a single question with 100% agreement would, naively,
+              get the same <Code>S = 1.0</Code> as a candidate who agreed on
+              fifteen questions. That&rsquo;s a small-sample-size problem —
+              one agreement isn&rsquo;t evidence of alignment, it&rsquo;s
+              noise. So we pro-rate <Code>S_raw</Code> by how many questions
+              actually overlapped, reaching full credit at{" "}
+              <Code>8</Code> overlapping answers:
+            </p>
+          </Prose>
+          <Formula
+            numerator="overlap_count"
+            denominator="8 (full credit threshold)"
+            label="factor"
+          />
+          <FinalFormula expression="S(c) = S_raw(c) × min(1, factor)" />
+          <Prose className="mt-3">
+            <p>
+              A candidate who matched on just 2 questions has their S scaled
+              by <Code>2/8 = 0.25</Code> — so 100% agreement on 2 questions
+              becomes <Code>S = 0.25</Code>, not <Code>1.0</Code>. A candidate
+              who matched on 8+ keeps their full raw score. This stops a
+              tangential agreement from outranking candidates with substantive
+              coverage.
+            </p>
+          </Prose>
         </SubSection>
 
         <SubSection title="Step 4 — coverage (C)">
           <Prose>
             <p>
-              How confident is this match? We compute the share of canonical
-              questions on your priority topics that the candidate took any
-              position on:
+              How confident is this match in a different sense: did the
+              candidate take positions on the questions in your <em>priority</em>{" "}
+              topics specifically? We compute the share of canonical questions
+              on your top-5 priority topics that the candidate addressed (any
+              stance other than &ldquo;not addressed&rdquo;):
             </p>
           </Prose>
           <Formula
@@ -369,11 +399,13 @@ export default async function MethodologyPage() {
           />
           <Prose>
             <p>
-              C is shown <strong>separately</strong>, not blended into the main
-              match score. If C is below <Code>0.4</Code> we explicitly flag
-              the result as &ldquo;low coverage&rdquo; — the candidate
-              didn&rsquo;t address most of what matters to you, so the match
-              score is based on limited information rather than disagreement.
+              C is shown alongside T, S, and the headline Match. If C is below{" "}
+              <Code>0.4</Code> we flag the result as &ldquo;low coverage&rdquo;
+              and visually separate it from the main ranked list in a{" "}
+              &ldquo;Limited information&rdquo; section. The top-match hero
+              card only ever shows a high-coverage candidate — without that,
+              we explicitly say &ldquo;no strong matches yet&rdquo; rather than
+              promote a noisy result.
             </p>
           </Prose>
         </SubSection>

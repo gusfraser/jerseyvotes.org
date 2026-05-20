@@ -2,6 +2,12 @@ import Link from "next/link";
 import { sql, daysUntilElection } from "@/lib/db";
 import { TrackedLink } from "@/lib/track-click";
 
+// Render on every request so the "X days until you vote" hero is always
+// today's number. ISR (revalidate = N) leaves a window where the cached
+// HTML can be N seconds stale; force-dynamic eliminates that. The DB cost
+// is three small COUNT queries on Neon — cheap enough for every visit.
+export const dynamic = "force-dynamic";
+
 const JERSEY_CONSTITUENCIES = [
   // 12 parishes (Connétable)
   "St Helier",

@@ -9,6 +9,10 @@ export const metadata: Metadata = {
     "Rank your priorities and answer policy questions to see which 2026 Jersey election candidates best match your views. Every score is transparent and traceable to manifesto quotes.",
 };
 
+// Render on every request so the "days until polling day" header is
+// always today's number. See web/src/app/page.tsx for the same rationale.
+export const dynamic = "force-dynamic";
+
 export default function CandidateQuizPage() {
   const days = daysUntilElection();
   return (

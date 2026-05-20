@@ -2,10 +2,11 @@ import Link from "next/link";
 import { sql, daysUntilElection } from "@/lib/db";
 import { TrackedLink } from "@/lib/track-click";
 
-// Force a fresh render at least hourly so the "X days until you vote" hero
-// doesn't get frozen to the build-time value. Without this, Next 16 static-
-// generates the whole page and the countdown stops moving until next deploy.
-export const revalidate = 3600;
+// Render on every request so the "X days until you vote" hero is always
+// today's number. ISR (revalidate = N) leaves a window where the cached
+// HTML can be N seconds stale; force-dynamic eliminates that. The DB cost
+// is three small COUNT queries on Neon — cheap enough for every visit.
+export const dynamic = "force-dynamic";
 
 const JERSEY_CONSTITUENCIES = [
   // 12 parishes (Connétable)

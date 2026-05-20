@@ -8,10 +8,9 @@ export const metadata: Metadata = {
     "Browse and filter the candidates standing in the 2026 Jersey election. Each candidate's manifesto is analysed against 16 policy topics with verifiable source quotes.",
 };
 
-// Re-render at least hourly so the "X days until polling day" pill stays
-// current. Without this, Next 16 statically generates the page and the
-// countdown freezes at the build-time value.
-export const revalidate = 3600;
+// Render on every request so the "X days until polling day" pill is
+// always today's number. See web/src/app/page.tsx for the same rationale.
+export const dynamic = "force-dynamic";
 
 type CandidateRow = {
   candidate_id: number;

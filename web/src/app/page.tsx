@@ -132,7 +132,7 @@ export default async function Home() {
             />
             <HowItWorksCard
               n={2}
-              title="Answer about 40 policy questions"
+              title="Answer about 30 policy questions"
               body="Agree, disagree, or skip on Jersey-specific statements."
             />
             <HowItWorksCard

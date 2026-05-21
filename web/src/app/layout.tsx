@@ -82,6 +82,13 @@ export default function RootLayout({
               >
                 methodology
               </a>
+              {" "}and{" "}
+              <a
+                href="/privacy"
+                className="text-red-700 hover:underline"
+              >
+                privacy notice
+              </a>
               .
             </p>
           </div>

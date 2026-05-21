@@ -624,6 +624,34 @@ export default async function MethodologyPage() {
         <ul className="space-y-4 mt-5">
           <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              21 May 2026 — Privacy + opt-out + analytics changes
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Published privacy notice; opt-out is now &ldquo;not analysed&rdquo; rather than &ldquo;hidden&rdquo;; removed Google Analytics
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              A formal privacy and data-handling page is now published at{" "}
+              <Link
+                href="/privacy"
+                className="text-red-700 hover:underline"
+              >
+                /privacy
+              </Link>{" "}
+              documenting the lawful basis for processing under the Data
+              Protection (Jersey) Law 2018, the AI / automated-decision-making
+              safeguards, recipients and international transfers, and
+              candidate rights. The opt-out flow now leaves candidates
+              visible in the candidate index as &ldquo;standing in the
+              election but opted out of analysis&rdquo; with a link to their
+              vote.je profile, rather than hiding them entirely (more
+              transparent to voters; previously a hidden candidate looked
+              indistinguishable from one not standing). Google Analytics has
+              been removed entirely so no cookies are set and no third-party
+              tracking scripts are loaded.
+            </p>
+          </li>
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
               21 May 2026 — Data correction (Reform Jersey)
             </p>
             <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">

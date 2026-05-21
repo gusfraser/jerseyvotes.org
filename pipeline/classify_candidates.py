@@ -351,6 +351,18 @@ def main():
                 cur = conn.cursor()
         raise RuntimeError(f'Failed to persist candidate {cand_id} after retry')
 
+    # Cache LLM results by manifesto text. Candidates sharing the exact same
+    # manifesto (all Reform candidates share the party manifesto, etc.) need
+    # to produce identical topic + stance results — running separate LLM
+    # calls per candidate produces sampling noise on borderline questions.
+    # Hash-keying ensures one call per unique text, replicated to all sharers.
+    import hashlib
+    extraction_cache: dict[str, tuple[list[dict], list[dict]]] = {}
+    cache_hits = 0
+
+    def manifesto_key(text: str) -> str:
+        return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
     for i, (cand_id, name, manifesto, wc) in enumerate(rows):
         if not manifesto or wc == 0:
             try:
@@ -363,9 +375,16 @@ def main():
                 conn.commit()
             continue
         try:
-            topics = classify_topics(client, manifesto)
-            time.sleep(BATCH_DELAY_SEC)
-            stances = classify_stances(client, manifesto, db_questions)
+            key = manifesto_key(manifesto)
+            cached = extraction_cache.get(key)
+            if cached is not None:
+                topics, stances = cached
+                cache_hits += 1
+            else:
+                topics = classify_topics(client, manifesto)
+                time.sleep(BATCH_DELAY_SEC)
+                stances = classify_stances(client, manifesto, db_questions)
+                extraction_cache[key] = (topics, stances)
         except Exception as e:
             print(f'  ERROR classifying {name}: {e}')
             errs += 1
@@ -387,7 +406,8 @@ def main():
 
     cur.close()
     conn.close()
-    print(f'\nDone. ok={ok}, errors={errs}')
+    print(f'\nDone. ok={ok}, errors={errs}, cache_hits={cache_hits} '
+          f'(unique manifestos: {len(extraction_cache)})')
 
 
 if __name__ == '__main__':

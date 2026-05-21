@@ -159,6 +159,19 @@ export default async function MethodologyPage() {
             list).
           </p>
           <p>
+            The vote.je profile is character-limited, so where we can find a
+            longer manifesto published by the candidate elsewhere — a party
+            manifesto PDF, a personal campaign site, etc. — we use both
+            sources together. The longer manifesto provides the bulk of the
+            policy detail; the vote.je entry provides the candidate&rsquo;s
+            own signed summary and can add coverage on topics the longer
+            source didn&rsquo;t address. Both sources are linked from the
+            &ldquo;Manifesto sources&rdquo; card on each candidate page so
+            voters can read either or both directly. See{" "}
+            <em>How positions are extracted</em> below for how the two are
+            combined.
+          </p>
+          <p>
             Sitting members have separate voting records from{" "}
             <ExternalLink href="https://statesassembly.je">statesassembly.je</ExternalLink>{" "}
             going back to 2004. We link candidates to those records by

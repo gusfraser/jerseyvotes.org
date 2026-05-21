@@ -270,14 +270,18 @@ export default async function CorrectionPreview({
 
       <section className="mb-8 mt-12 pt-8 border-t border-gray-200 dark:border-zinc-800">
         <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
-          Remove my profile
+          Opt out of analysis
         </h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          If you&rsquo;d rather not appear on jerseyvotes.org at all, you can
-          remove your profile from here. This will hide your name, manifesto
-          extracts, and policy positions from the candidate index, your public
-          profile page, search results, the matching quiz, and the sitemap.
-          The action takes effect immediately. To reverse it later, email{" "}
+          If you&rsquo;d rather not have your manifesto analysed on
+          jerseyvotes.org, you can opt out from here. This removes the topic
+          and policy-position analysis from your profile and excludes you
+          from the matching quiz. Your name, role, parish, and party will
+          still appear in the candidate index — those are public facts
+          about who is standing in the election — but with an &ldquo;Opted
+          out of analysis&rdquo; badge and a link to your vote.je profile
+          instead of any extracted content. The action takes effect
+          immediately. To reverse it later, email{" "}
           <a href="mailto:gus@helix.je" className="underline hover:text-red-700">
             gus@helix.je
           </a>
@@ -311,7 +315,7 @@ export default async function CorrectionPreview({
             type="submit"
             className="inline-flex items-center gap-2 px-5 py-3 bg-red-700 text-white rounded-lg hover:bg-red-800 font-semibold text-sm"
           >
-            Remove my profile from jerseyvotes.org
+            Opt out of analysis on jerseyvotes.org
           </button>
         </form>
       </section>
@@ -339,14 +343,16 @@ function OptedOutView({ candidate }: { candidate: CandidateWithExtractions }) {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-5 mb-6">
         <p className="font-semibold text-green-900 dark:text-green-200 mb-1">
-          Profile removed
+          Opted out of analysis
         </p>
         <p className="text-sm text-green-900/90 dark:text-green-200/90 leading-relaxed">
-          The profile for <strong>{candidate.full_name}</strong> was removed
-          from jerseyvotes.org on {optedOutOn}. Your name, manifesto extracts,
-          and policy positions no longer appear in the candidate index, your
-          public profile page, search results, the matching quiz, or the
-          sitemap.
+          <strong>{candidate.full_name}</strong> opted out of analysis on{" "}
+          {optedOutOn}. Your topic and policy-position analysis has been
+          removed from your public profile and the matching quiz. Your name,
+          role, parish, and party still appear in the candidate index — those
+          are public facts about who is standing in the election — but with
+          an &ldquo;Opted out of analysis&rdquo; badge and a link to your
+          vote.je profile instead of any extracted content.
         </p>
       </div>
       <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">

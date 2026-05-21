@@ -13,12 +13,12 @@ export default async function MethodologyPage() {
   const [statsRow, questionRowsAny] = await Promise.all([
     sql`
       SELECT
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL) AS total,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026) AS total,
         (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND classified_at IS NOT NULL) AS classified,
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND incumbent_member_id IS NOT NULL) AS incumbents,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND incumbent_member_id IS NOT NULL) AS incumbents,
         (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND scrape_status = 'low_content') AS low_content,
         (SELECT COUNT(*) FROM canonical_questions WHERE election_year = 2026) AS questions,
-        (SELECT MAX(scraped_at) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL) AS last_scrape
+        (SELECT MAX(scraped_at) FROM candidates WHERE election_year = 2026) AS last_scrape
     `,
     sql`
       SELECT topic, statement
@@ -556,14 +556,19 @@ export default async function MethodologyPage() {
             retroactively.
           </p>
           <p>
-            <strong>Candidates who don&rsquo;t want to appear on the site
-            can remove themselves directly from their private review link
-            — no email needed.</strong> A confirmation step (typing{" "}
-            <Code>OPT OUT</Code>) prevents accidental triggers. Removed
-            profiles disappear immediately from the candidate index, public
-            profile pages, search results, the quiz, and the sitemap.
-            Re-instatement is by email — write to gus@helix.je and we&rsquo;ll
-            restore the profile within 24 hours.
+            <strong>Candidates who don&rsquo;t want their manifesto
+            analysed on the site can opt out directly from their private
+            review link — no email needed.</strong> A confirmation step
+            (typing <Code>OPT OUT</Code>) prevents accidental triggers.
+            Opting out removes the candidate&rsquo;s topic and policy-position
+            analysis from the public profile and the quiz immediately. The
+            candidate&rsquo;s name, role, parish, and party still appear in
+            the candidate index — those are public States Greffe facts
+            about who is standing in the election — but with an &ldquo;Opted
+            out of analysis&rdquo; badge and a link to their vote.je profile
+            instead of any extracted content. Re-instatement is by email —
+            write to gus@helix.je and we&rsquo;ll restore the analysis
+            within 24 hours.
           </p>
         </Prose>
       </Section>

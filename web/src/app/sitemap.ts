@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const [members, candidates] = await Promise.all([
     sql`SELECT canonical_name FROM members ORDER BY canonical_name`,
-    sql`SELECT vote_je_slug FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL ORDER BY vote_je_slug`,
+    sql`SELECT vote_je_slug FROM candidates WHERE election_year = 2026 ORDER BY vote_je_slug`,
   ]);
 
   const memberRoutes: MetadataRoute.Sitemap = members.map(

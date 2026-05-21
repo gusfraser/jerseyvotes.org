@@ -25,6 +25,7 @@ type CandidateRow = {
   classified_at: string | null;
   manifesto_word_count: number | null;
   enhanced_manifesto_status: string | null;
+  opted_out_at: string | null;
   topics: string[] | null;
 };
 
@@ -60,6 +61,7 @@ export default async function CandidatesPage({
     SELECT c.candidate_id, c.vote_je_slug, c.full_name, c.role, c.constituency,
            c.party, c.photo_url, c.incumbent_member_id, c.scrape_status,
            c.classified_at, c.manifesto_word_count, c.enhanced_manifesto_status,
+           c.opted_out_at,
            ARRAY(
              SELECT topic FROM candidate_topics ct
              WHERE ct.candidate_id = c.candidate_id
@@ -67,7 +69,6 @@ export default async function CandidatesPage({
            ) AS topics
     FROM candidates c
     WHERE c.election_year = 2026
-      AND c.opted_out_at IS NULL
       AND (
         ${constituencyList === null}::boolean
         OR c.constituency = ANY(${constituencyList ?? []}::text[])
@@ -81,16 +82,17 @@ export default async function CandidatesPage({
         OR EXISTS (
           SELECT 1 FROM candidate_topics ct
           WHERE ct.candidate_id = c.candidate_id AND ct.topic = ${topic}
+            AND c.opted_out_at IS NULL
         )
       )
-    ORDER BY c.full_name
+    ORDER BY c.opted_out_at IS NOT NULL, c.full_name
   `) as unknown as CandidateRow[];
 
   const filterOptions = await sql`
     SELECT
-      ARRAY(SELECT DISTINCT constituency FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND constituency IS NOT NULL ORDER BY 1) AS constituencies,
-      ARRAY(SELECT DISTINCT role FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND role IS NOT NULL ORDER BY 1) AS roles,
-      ARRAY(SELECT DISTINCT party FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND party IS NOT NULL ORDER BY 1) AS parties,
+      ARRAY(SELECT DISTINCT constituency FROM candidates WHERE election_year = 2026 AND constituency IS NOT NULL ORDER BY 1) AS constituencies,
+      ARRAY(SELECT DISTINCT role FROM candidates WHERE election_year = 2026 AND role IS NOT NULL ORDER BY 1) AS roles,
+      ARRAY(SELECT DISTINCT party FROM candidates WHERE election_year = 2026 AND party IS NOT NULL ORDER BY 1) AS parties,
       ARRAY(SELECT DISTINCT topic FROM candidate_topics ORDER BY 1) AS topics
   `;
   const opts = filterOptions[0] as Record<string, string[]>;
@@ -267,12 +269,17 @@ function CandidateCard({ c }: { c: CandidateRow }) {
   const isIncumbent = c.incumbent_member_id !== null;
   const hasEnhanced = c.enhanced_manifesto_status === "found";
   const isLowContent = c.scrape_status === "low_content" && !hasEnhanced;
+  const isOptedOut = c.opted_out_at !== null;
   const topics = (c.topics ?? []).filter(Boolean);
 
   return (
     <Link
       href={`/candidates/${c.vote_je_slug}`}
-      className="block bg-white dark:bg-zinc-900 rounded-lg border border-gray-200 dark:border-zinc-800 p-4 hover:border-red-300 hover:shadow-sm transition-all"
+      className={`block rounded-lg border p-4 transition-all ${
+        isOptedOut
+          ? "bg-gray-50 dark:bg-zinc-950 border-dashed border-gray-200 dark:border-zinc-800 hover:border-gray-400"
+          : "bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 hover:border-red-300 hover:shadow-sm"
+      }`}
     >
       <div className="flex gap-4">
         <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-zinc-800">
@@ -281,7 +288,9 @@ function CandidateCard({ c }: { c: CandidateRow }) {
             <img
               src={c.photo_url}
               alt={c.full_name}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${
+                isOptedOut ? "grayscale opacity-70" : ""
+              }`}
               loading="lazy"
             />
           ) : (
@@ -291,7 +300,13 @@ function CandidateCard({ c }: { c: CandidateRow }) {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <p
+            className={`font-semibold truncate ${
+              isOptedOut
+                ? "text-gray-600 dark:text-gray-400"
+                : "text-gray-900 dark:text-gray-100"
+            }`}
+          >
             {c.full_name}
           </p>
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex-wrap">
@@ -309,17 +324,22 @@ function CandidateCard({ c }: { c: CandidateRow }) {
                 {c.party}
               </span>
             )}
-            {isIncumbent && (
+            {isOptedOut && (
+              <span className="text-xs bg-gray-200 dark:bg-zinc-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded">
+                Opted out of analysis
+              </span>
+            )}
+            {!isOptedOut && isIncumbent && (
               <span className="text-xs bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-1.5 py-0.5 rounded">
                 Incumbent
               </span>
             )}
-            {isLowContent && (
+            {!isOptedOut && isLowContent && (
               <span className="text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">
                 Short manifesto
               </span>
             )}
-            {hasEnhanced && (
+            {!isOptedOut && hasEnhanced && (
               <span className="text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded">
                 Extended manifesto
               </span>
@@ -327,7 +347,7 @@ function CandidateCard({ c }: { c: CandidateRow }) {
           </div>
         </div>
       </div>
-      {topics.length > 0 && (
+      {!isOptedOut && topics.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {topics.map((t) => (
             <span

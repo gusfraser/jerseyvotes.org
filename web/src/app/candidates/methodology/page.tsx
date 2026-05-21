@@ -559,6 +559,116 @@ export default async function MethodologyPage() {
         </ul>
       </Section>
 
+      {/* Question set changelog */}
+      <Section title="Question set changes">
+        <Prose>
+          <p>
+            The canonical question list is fixed for an election cycle and
+            versioned in the public repo
+            (<Code>pipeline/canonical_questions.yaml</Code>). When a question is
+            added, removed, or substantively reworded mid-cycle we log the
+            change here so anyone comparing scores across time can see what
+            shifted. Stances on a retired question are deleted from the
+            database; the new question is populated by re-running the LLM
+            stance extraction over every candidate&rsquo;s manifesto.
+          </p>
+        </Prose>
+        <ul className="space-y-4 mt-5">
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              May 2026 — Constitutional &amp; Electoral
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Senator reinstatement → Connétables in the States
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              The question <em>&ldquo;Jersey should reinstate island-wide
+              Senator seats in the States Assembly&rdquo;</em> was retired.
+              Senators were reinstated for the 2026 election, so the question
+              had been overtaken by events — every candidate&rsquo;s stance was
+              effectively about a settled matter. It was replaced with{" "}
+              <em>&ldquo;Connétables should no longer sit as voting members of
+              the States Assembly&rdquo;</em>, a long-running Jersey
+              constitutional debate.
+            </p>
+          </li>
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              May 2026 — Question set review
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Canonical question set revised: 38 → 32
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-2">
+              A coverage analysis across all 92 candidate manifestos showed
+              that several canonical questions were generating no usable
+              signal — either because the underlying policy was already
+              settled (voting age has been 16 since 2007), or because the
+              specific framing wasn&rsquo;t engaged in any 2026 manifesto, or
+              because the wording allowed universal agreement and no
+              discrimination between candidates. The set was revised to:
+            </p>
+            <ul className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed list-disc pl-5 space-y-1">
+              <li>
+                <strong>Retire 10 questions</strong> with under 5% coverage in
+                manifestos:{" "}
+                <code className="text-xs">const.voting_age_16</code>,{" "}
+                <code className="text-xs">finsvc_beneficial_ownership</code>,{" "}
+                <code className="text-xs">env.single_use_plastics</code>,{" "}
+                <code className="text-xs">edu.private_schools_funding</code>,{" "}
+                <code className="text-xs">health.assisted_dying</code>,{" "}
+                <code className="text-xs">equality.gender_pay_reporting</code>,{" "}
+                <code className="text-xs">agri.fisheries_french_access</code>,{" "}
+                <code className="text-xs">intl.eu_alignment</code>,{" "}
+                <code className="text-xs">intl.uk_relationship</code>,{" "}
+                <code className="text-xs">justice.sentencing_reform</code>.
+                The International &amp; Trade topic is left with no canonical
+                questions — international policy is genuinely not engaged in
+                local manifestos. The topic still exists for proposition and
+                manifesto classification.
+              </li>
+              <li>
+                <strong>Reframe 4 questions</strong> from soft-agreement
+                framings to trade-off framings that invite real
+                disagreement:{" "}
+                <code className="text-xs">agri.farming_subsidies</code>{" "}
+                (now broader: financial support for farming and fisheries,
+                covering subsidies + loans + grants),{" "}
+                <code className="text-xs">housing.affordable_target</code>{" "}
+                (now: minimum affordable-unit requirement on new private
+                developments),{" "}
+                <code className="text-xs">health.mental_health_funding</code>{" "}
+                (now: mental health funding increased even if it reduces
+                physical-health spending),{" "}
+                <code className="text-xs">gov.civil_service_size</code>{" "}
+                (now: reducing civil service prioritised over maintaining
+                public service levels).
+              </li>
+              <li>
+                <strong>Add 4 new questions</strong> covering live 2026
+                Jersey debates:{" "}
+                <code className="text-xs">gov.population_cap</code> (binding
+                annual cap on net migration),{" "}
+                <code className="text-xs">trans.air_links</code>{" "}
+                (state-subsidised affordable air and sea links to the UK),{" "}
+                <code className="text-xs">env.energy_independence</code>{" "}
+                (higher short-term electricity costs for domestic renewable
+                investment),{" "}
+                <code className="text-xs">edu.childcare_costs</code>{" "}
+                (financial support for childcare costs faced by working
+                families).
+              </li>
+            </ul>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mt-3">
+              All candidate stances were re-extracted from the same manifestos
+              already on file. No candidates were re-emailed for the changes
+              — their next visit to their private review link reflects the
+              revised question set.
+            </p>
+          </li>
+        </ul>
+      </Section>
+
       {/* Source code */}
       <Section title="Source code and licence">
         <Prose>

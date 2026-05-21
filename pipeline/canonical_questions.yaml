@@ -6,6 +6,21 @@
 #
 # This file is the source of truth; pipeline/classify_candidates.py upserts it
 # into the canonical_questions table on each run.
+#
+# Revision history (see methodology page changelog for public version):
+#   May 2026 — Retired const.senator_reinstatement (senators reinstated for
+#     2026), const.voting_age_16 (already 16 since 2007). Added
+#     const.connetables_states_seats and gov.population_cap. Reframed
+#     agri.farming_subsidies, housing.affordable_target,
+#     health.mental_health_funding, gov.civil_service_size for sharper
+#     discrimination. Retired finsvc_beneficial_ownership,
+#     env.single_use_plastics, edu.private_schools_funding,
+#     health.assisted_dying, equality.gender_pay_reporting,
+#     agri.fisheries_french_access, intl.eu_alignment, intl.uk_relationship,
+#     justice.sentencing_reform (all <5% coverage in extracted manifestos,
+#     no Jersey 2026 salience). International & Trade topic ends with zero
+#     canonical questions — the topic still exists for proposition and
+#     manifesto classification but has no quiz questions.
 
 election_year: 2026
 
@@ -19,24 +34,24 @@ questions:
 
   - id: gov.civil_service_size
     topic: Government & Administration
-    statement: Jersey's civil service has grown too large and should be reduced.
-    explainer: Headcount and spending on senior officers have been a recurring debate.
+    statement: Reducing the size of the civil service should take priority over maintaining current public service levels.
+    explainer: Headcount and spending on senior officers have been a recurring debate; reframed to force a trade-off rather than allow universal agreement.
+
+  - id: gov.population_cap
+    topic: Government & Administration
+    statement: Jersey should adopt a binding annual cap on net migration.
+    explainer: Population growth and migration policy is a defining 2026 divide between Reform Jersey and many Independent candidates.
 
   # --- Constitutional & Electoral ---
-  - id: const.senator_reinstatement
+  - id: const.connetables_states_seats
     topic: Constitutional & Electoral
-    statement: Jersey should reinstate island-wide Senator seats in the States Assembly.
-    explainer: Senators were removed in 2022; reinstatement has been debated each term since.
+    statement: Connétables should no longer sit as voting members of the States Assembly.
+    explainer: Connétables hold their States seats ex officio as parish heads; whether they should remain States Members is a long-running constitutional debate.
 
   - id: const.party_politics
     topic: Constitutional & Electoral
     statement: Organised political parties are good for Jersey democracy.
     explainer: Jersey is traditionally an independent-dominated assembly; party politics is contested.
-
-  - id: const.voting_age_16
-    topic: Constitutional & Electoral
-    statement: The voting age in Jersey should be lowered to 16.
-    explainer: Multiple proposals have come forward; debated alongside electoral reform.
 
   # --- Finance & Taxation ---
   - id: fin.gst_increase
@@ -76,6 +91,11 @@ questions:
     statement: Jersey should significantly expand subsidised public bus services.
     explainer: Bus subsidies and route expansion vs cost-recovery have been debated.
 
+  - id: trans.air_links
+    topic: Transport & Infrastructure
+    statement: The States should subsidise air and sea links to keep travel between Jersey and the UK affordable.
+    explainer: Air/sea connectivity affordability and the future of Jersey Airport routes is a recurring 2026 manifesto theme.
+
   # --- Planning & Environment ---
   - id: env.green_belt
     topic: Planning & Environment
@@ -87,21 +107,16 @@ questions:
     statement: Jersey should maintain its 2050 net-zero target with no delay.
     explainer: Carbon Neutral Roadmap commitments have faced pushback on cost.
 
-  - id: env.single_use_plastics
+  - id: env.energy_independence
     topic: Planning & Environment
-    statement: Jersey should ban more categories of single-use plastics and packaging.
-    explainer: Some plastic bans have been enacted; further bans are debated.
+    statement: Jersey should accept higher short-term electricity costs in order to invest in domestic renewable energy generation.
+    explainer: Jersey imports most of its electricity from France; the cost vs. energy-independence trade-off is debated.
 
   # --- Financial Services & Regulation ---
   - id: finsvc_industry_size
     topic: Financial Services & Regulation
     statement: Jersey should reduce its economic dependence on the finance industry by diversifying the economy.
     explainer: Finance accounts for ~40% of GVA; diversification vs growth is debated.
-
-  - id: finsvc_beneficial_ownership
-    topic: Financial Services & Regulation
-    statement: Jersey should make beneficial ownership of companies fully public.
-    explainer: The register is currently accessible to authorities but not the public.
 
   # --- Health & Wellbeing ---
   - id: health.new_hospital_overdale
@@ -111,13 +126,8 @@ questions:
 
   - id: health.mental_health_funding
     topic: Health & Wellbeing
-    statement: Mental health services should receive significantly more funding, even if it means trade-offs elsewhere.
-    explainer: Mental health funding levels and wait times have been a major political issue.
-
-  - id: health.assisted_dying
-    topic: Health & Wellbeing
-    statement: Jersey should introduce legal assisted dying for terminally ill adults.
-    explainer: The Assembly has voted in principle to allow assisted dying; implementation is ongoing.
+    statement: Mental health funding should be increased even if it requires reducing spending on physical-health services.
+    explainer: Mental health funding levels and wait times have been a major political issue; reframed to force a trade-off rather than allow universal agreement.
 
   # --- Property & Land ---
   - id: prop.public_land_housing
@@ -133,8 +143,8 @@ questions:
   # --- Housing ---
   - id: housing.affordable_target
     topic: Housing
-    statement: Jersey should set binding annual targets for affordable housing delivery.
-    explainer: Current targets are aspirational; binding targets are proposed.
+    statement: New private housing developments should be required to include a minimum proportion of affordable units.
+    explainer: Inclusionary-zoning requirements are debated as a tool for affordable supply; reframed from the prior "binding targets" question to focus on a specific policy mechanism.
 
   - id: housing.rent_controls
     topic: Housing
@@ -151,11 +161,6 @@ questions:
     topic: Justice & Policing
     statement: The States of Jersey Police should receive increased funding and headcount.
     explainer: Police resourcing levels are debated in successive Government Plans.
-
-  - id: justice.sentencing_reform
-    topic: Justice & Policing
-    statement: Jersey should focus on rehabilitation and community sentences rather than expanding the prison.
-    explainer: Sentencing policy and La Moye expansion proposals have been debated.
 
   # --- Consumer & Commercial ---
   - id: consumer.competition_powers
@@ -179,21 +184,15 @@ questions:
     statement: Free nursery hours for under-fives should be substantially expanded.
     explainer: Childcare costs and free hours have been a campaign issue.
 
-  - id: edu.private_schools_funding
+  - id: edu.childcare_costs
     topic: Children, Education & Families
-    statement: States subsidies to fee-paying schools should be reduced or removed.
-    explainer: Public funding for non-provided schools (fee-paying) is contested.
+    statement: The States should significantly increase financial support for childcare costs faced by working families.
+    explainer: Childcare costs are a top-tier cost-of-living concern, distinct from the free nursery hours question.
 
   # --- International & Trade ---
-  - id: intl.uk_relationship
-    topic: International & Trade
-    statement: Jersey should pursue greater autonomy from the UK in international representation.
-    explainer: The UK handles much of Jersey's external affairs; greater autonomy is debated.
-
-  - id: intl.eu_alignment
-    topic: International & Trade
-    statement: Jersey should align more closely with EU regulatory standards to maintain market access.
-    explainer: Post-Brexit, alignment with EU rules vs divergence is a live question.
+  # No canonical questions for this topic in 2026. International policy is
+  # not a salient theme in local-manifesto text; the topic still exists for
+  # proposition and manifesto classification but has no quiz questions.
 
   # --- Equality & Human Rights ---
   - id: equality.discrimination_protections
@@ -201,18 +200,8 @@ questions:
     statement: Discrimination Law protections should be extended to cover further protected characteristics.
     explainer: Jersey's Discrimination Law has been extended in stages; further extension is debated.
 
-  - id: equality.gender_pay_reporting
-    topic: Equality & Human Rights
-    statement: Jersey should require mandatory gender pay gap reporting for medium and large employers.
-    explainer: Pay gap reporting is not currently mandatory in Jersey.
-
   # --- Agriculture, Fisheries & Rural ---
   - id: agri.farming_subsidies
     topic: Agriculture, Fisheries & Rural
-    statement: Direct subsidies to Jersey farming should be increased to preserve the rural economy.
-    explainer: Agricultural support payments have been reformed multiple times.
-
-  - id: agri.fisheries_french_access
-    topic: Agriculture, Fisheries & Rural
-    statement: Jersey should maintain tight controls on French vessels accessing Jersey waters.
-    explainer: Post-Brexit access disputes have been a high-profile issue.
+    statement: The States should significantly increase financial support for Jersey's farming and fisheries sectors.
+    explainer: Reframed from the prior "direct subsidies" wording to cover loans, grants, and other support mechanisms — manifestos rarely commit to a specific instrument.

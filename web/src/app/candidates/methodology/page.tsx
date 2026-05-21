@@ -245,30 +245,47 @@ export default async function MethodologyPage() {
       <Section title="How positions are extracted">
         <Prose>
           <p>
-            For each candidate we run two LLM passes (Claude Sonnet 4.5) over
-            the manifesto. We use Sonnet rather than the cheaper Haiku here
+            For each candidate we run LLM passes (Claude Opus 4.7) over the
+            manifesto. We use Opus rather than the cheaper Sonnet or Haiku
             because extracting stances from free-form prose — especially
-            implicit, hedged, or conditional positions — needs more reading
-            comprehension than a topic-tagging task does. The rest of this
-            site&rsquo;s pipeline (the proposition classifier) still uses
-            Haiku, where it&rsquo;s well-calibrated.
+            implicit, hedged, or conditional positions — needs strong
+            reading comprehension. The rest of this site&rsquo;s pipeline
+            (the proposition classifier) still uses Haiku, where it&rsquo;s
+            well-calibrated.
           </p>
         </Prose>
 
         <ol className="mt-5 space-y-4">
-          <NumberedItem n={1} title="Topic extraction">
-            The model identifies which of the 16 categories the manifesto
-            substantively addresses, estimates a <em>salience</em> score (its
-            share of the manifesto, 0–1, summed ≤ 1), writes a one-sentence
-            summary of the candidate&rsquo;s position, and returns a verbatim
-            source quote.
+          <NumberedItem n={1} title="Topic extraction (primary source)">
+            The model reads the candidate&rsquo;s primary manifesto — either
+            their fuller online platform (party manifesto, personal campaign
+            site, etc.) or the vote.je listing if no fuller source was found
+            — and identifies which of the 16 categories it substantively
+            addresses, estimates a <em>salience</em> score (share of the
+            manifesto, 0–1, summed ≤ 1), writes a one-sentence summary, and
+            returns a verbatim source quote.
           </NumberedItem>
-          <NumberedItem n={2} title="Stance extraction">
-            Against a fixed list of {String(stats.questions ?? 40)} canonical
+          <NumberedItem n={2} title="Stance extraction (primary source)">
+            Against the fixed list of {String(stats.questions ?? 40)} canonical
             policy statements, the model marks the candidate as{" "}
             <Code>agree</Code>, <Code>disagree</Code>, <Code>neutral</Code>, or{" "}
             <Code>not_addressed</Code>, with a verbatim source quote when the
-            stance is anything other than not_addressed.
+            stance is anything other than not_addressed. Candidates who share
+            an identical primary manifesto (all members of a single party,
+            for instance) share this extraction by construction — it&rsquo;s
+            cached by text hash so the same input always produces the same
+            output.
+          </NumberedItem>
+          <NumberedItem n={3} title="Stance gap-fill (vote.je secondary)">
+            If a candidate has BOTH a fuller source and a separate vote.je
+            entry, we run a second stance pass on the vote.je text against
+            only the questions Pass 2 left as <Code>not_addressed</Code>. Any
+            position the candidate took in their own vote.je entry that the
+            shared source didn&rsquo;t cover is promoted into their final
+            result. The gap-fill can only ADD coverage, never override a
+            stance the primary source already established — so party
+            candidates keep a unified party answer-set while still surfacing
+            individual emphasis in their own statements.
           </NumberedItem>
         </ol>
 

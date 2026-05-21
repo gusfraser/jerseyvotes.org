@@ -49,7 +49,7 @@ CATEGORIES = [
     'Agriculture, Fisheries & Rural',
 ]
 
-MODEL = 'claude-sonnet-4-5'  # see /candidates/methodology — Sonnet for nuance on free-form manifestos
+MODEL = 'claude-opus-4-7'  # see /candidates/methodology — Opus for nuance on free-form manifestos and combined multi-source inputs
 BATCH_DELAY_SEC = 0.5
 TOPIC_BATCH = 1   # one call per candidate; manifesto context too large to batch
 STANCE_BATCH = 1
@@ -284,9 +284,11 @@ def main():
     cur.execute('SELECT question_id, topic, statement FROM canonical_questions ORDER BY sort_order')
     db_questions = [{'question_id': r[0], 'topic': r[1], 'statement': r[2]} for r in cur.fetchall()]
 
-    # An enhanced manifesto found via find_enhanced_manifestos.py is preferred
-    # over the vote.je text, so a candidate is eligible if EITHER source has
-    # content. The COALESCE in the SELECT picks the richer one at read time.
+    # A candidate is eligible if EITHER the scrape produced text OR an
+    # enhanced manifesto was found. We pull both sources separately and
+    # combine them with provenance labels at classification time — the
+    # vote.je entry is the candidate's own signed statement and must not
+    # be silently dropped just because a richer party-page source exists.
     where = """WHERE (scrape_status IN ('ok', 'low_content')
                      OR (enhanced_manifesto_text IS NOT NULL
                          AND enhanced_manifesto_text <> ''))"""
@@ -298,7 +300,8 @@ def main():
                               AND enhanced_manifesto_fetched_at > classified_at))"""
     cur.execute(f'''
         SELECT candidate_id, full_name,
-               COALESCE(NULLIF(enhanced_manifesto_text, ''), manifesto_text) AS manifesto,
+               NULLIF(enhanced_manifesto_text, '') AS enhanced_text,
+               NULLIF(manifesto_text, '') AS voteje_text,
                COALESCE(NULLIF(enhanced_manifesto_word_count, 0),
                         manifesto_word_count) AS wc
         FROM candidates
@@ -351,20 +354,33 @@ def main():
                 cur = conn.cursor()
         raise RuntimeError(f'Failed to persist candidate {cand_id} after retry')
 
-    # Cache LLM results by manifesto text. Candidates sharing the exact same
-    # manifesto (all Reform candidates share the party manifesto, etc.) need
-    # to produce identical topic + stance results — running separate LLM
-    # calls per candidate produces sampling noise on borderline questions.
-    # Hash-keying ensures one call per unique text, replicated to all sharers.
+    # Hybrid extraction (see /candidates/methodology):
+    #   Pass 1 (primary):   extract from the longest single source — typically
+    #                       the enhanced manifesto (party PDF / personal site)
+    #                       or vote.je if no enhanced exists. CACHED by text
+    #                       hash so candidates sharing a party manifesto get
+    #                       one identical extraction.
+    #   Pass 2 (gap-fill):  if BOTH sources exist, run a second stance pass
+    #                       against the vote.je text on only those questions
+    #                       Pass 1 returned as not_addressed. Any stance the
+    #                       vote.je entry takes on a question the party text
+    #                       didn't address is promoted into the result.
+    #
+    # Effect: same-party candidates share most stances (Pass 1 is shared);
+    # individual vote.je content can only ADD coverage on questions the
+    # shared text was silent on. The model never has to reconcile two
+    # documents in a single call.
     import hashlib
     extraction_cache: dict[str, tuple[list[dict], list[dict]]] = {}
     cache_hits = 0
+    gap_fills = 0
 
     def manifesto_key(text: str) -> str:
         return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
-    for i, (cand_id, name, manifesto, wc) in enumerate(rows):
-        if not manifesto or wc == 0:
+    for i, (cand_id, name, enhanced_text, voteje_text, wc) in enumerate(rows):
+        primary_text = (enhanced_text or '').strip() or (voteje_text or '').strip()
+        if not primary_text or wc == 0:
             try:
                 cur.execute('UPDATE candidates SET classified_at = NOW() WHERE candidate_id = %s', (cand_id,))
                 conn.commit()
@@ -375,16 +391,42 @@ def main():
                 conn.commit()
             continue
         try:
-            key = manifesto_key(manifesto)
+            # Pass 1: primary extraction, cached by primary-text hash so all
+            # candidates sharing a party manifesto get identical results.
+            key = manifesto_key(primary_text)
             cached = extraction_cache.get(key)
             if cached is not None:
                 topics, stances = cached
+                # Deep-copy stances so we don't mutate the cached version
+                # during Pass 2 gap-fill.
+                stances = [dict(s) for s in stances]
                 cache_hits += 1
             else:
-                topics = classify_topics(client, manifesto)
+                topics = classify_topics(client, primary_text)
                 time.sleep(BATCH_DELAY_SEC)
-                stances = classify_stances(client, manifesto, db_questions)
-                extraction_cache[key] = (topics, stances)
+                stances = classify_stances(client, primary_text, db_questions)
+                extraction_cache[key] = (topics, [dict(s) for s in stances])
+
+            # Pass 2: gap-fill from the candidate's vote.je entry, but only
+            # when (a) we have BOTH sources, (b) they're different texts,
+            # and (c) Pass 1 left at least one question as not_addressed.
+            voteje_text_clean = (voteje_text or '').strip()
+            if (enhanced_text and voteje_text_clean
+                    and voteje_text_clean != primary_text):
+                gap_qids = {s['question_id'] for s in stances if s['stance'] == 'not_addressed'}
+                gap_questions = [q for q in db_questions if q['question_id'] in gap_qids]
+                if gap_questions:
+                    time.sleep(BATCH_DELAY_SEC)
+                    voteje_stances = classify_stances(client, voteje_text_clean, gap_questions)
+                    voteje_by_id = {s['question_id']: s for s in voteje_stances}
+                    promotions = 0
+                    for s in stances:
+                        v = voteje_by_id.get(s['question_id'])
+                        if v and v['stance'] != 'not_addressed' and s['stance'] == 'not_addressed':
+                            s.update(v)
+                            promotions += 1
+                    if promotions:
+                        gap_fills += 1
         except Exception as e:
             print(f'  ERROR classifying {name}: {e}')
             errs += 1
@@ -406,8 +448,8 @@ def main():
 
     cur.close()
     conn.close()
-    print(f'\nDone. ok={ok}, errors={errs}, cache_hits={cache_hits} '
-          f'(unique manifestos: {len(extraction_cache)})')
+    print(f'\nDone. ok={ok}, errors={errs}, cache_hits={cache_hits}, '
+          f'gap_fills={gap_fills} (unique primary manifestos: {len(extraction_cache)})')
 
 
 if __name__ == '__main__':

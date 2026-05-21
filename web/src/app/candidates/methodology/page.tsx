@@ -165,6 +165,19 @@ export default async function MethodologyPage() {
             normalised name matching where it&rsquo;s safe to do so; otherwise
             the candidate is treated as a new entrant.
           </p>
+          <p>
+            <strong>Transparency rule:</strong> any manifesto text we analyse
+            must be traceable to a public URL that anyone can open and check.
+            The link to the source document is shown in the &ldquo;Manifesto
+            sources&rdquo; card on every candidate&rsquo;s page — vote.je
+            profile, party manifesto PDF, personal campaign site, or whatever
+            was used. This is a hard invariant: the database refuses to
+            store manifesto text without an accompanying public URL (CHECK
+            constraints <Code>manifesto_text_must_have_voteje_url</Code> and{" "}
+            <Code>enhanced_manifesto_text_must_have_source_url</Code>), so a
+            future code change can&rsquo;t silently introduce untraceable
+            text.
+          </p>
         </Prose>
       </Section>
 

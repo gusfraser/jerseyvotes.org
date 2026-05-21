@@ -111,7 +111,22 @@ CREATE TABLE candidates (
     -- All public-facing queries must filter `opted_out_at IS NULL`.
     -- Soft-delete (not row deletion) so audit + topics/stances FKs are preserved.
     opted_out_at TIMESTAMPTZ,
-    election_year INTEGER NOT NULL DEFAULT 2026
+    election_year INTEGER NOT NULL DEFAULT 2026,
+
+    -- Transparency invariant: any stored manifesto text MUST be traceable
+    -- to a public URL. The candidate profile page surfaces these links to
+    -- readers; the CHECK constraints below stop a code change from silently
+    -- storing untraceable text.
+    CONSTRAINT manifesto_text_must_have_voteje_url CHECK (
+        manifesto_text IS NULL
+        OR length(manifesto_text) = 0
+        OR (profile_url IS NOT NULL AND length(profile_url) > 0)
+    ),
+    CONSTRAINT enhanced_manifesto_text_must_have_source_url CHECK (
+        enhanced_manifesto_text IS NULL
+        OR length(enhanced_manifesto_text) = 0
+        OR (enhanced_manifesto_source_url IS NOT NULL AND length(enhanced_manifesto_source_url) > 0)
+    )
 );
 
 -- LLM-extracted topic coverage per candidate (uses the existing 16-cat taxonomy)

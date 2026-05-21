@@ -34,11 +34,17 @@ type CandidateFull = {
 const ENHANCED_SOURCE_LABELS: Record<string, string> = {
   personal_site: "Personal site",
   party_page: "Party page",
+  party_manifesto: "Party manifesto",
   facebook: "Facebook",
   linkedin: "LinkedIn",
   news_interview: "News interview",
   other: "Web source",
 };
+
+function sourceLabelWithFormat(label: string, url: string | null): string {
+  const isPdf = !!url && url.toLowerCase().endsWith(".pdf");
+  return isPdf ? `${label} (PDF)` : label;
+}
 
 type TopicRow = {
   topic: string;
@@ -344,101 +350,89 @@ export default async function CandidateProfile({
         </section>
       )}
 
-      {/* Full manifesto. When we have an enhanced (web-sourced) manifesto we
-          show it as primary because the topic + stance classification on this
-          page is derived from it — readers need to see the same text the
-          source_quote excerpts came from. The original vote.je listing stays
-          available in a collapsed block underneath. */}
+      {/* Manifesto sources. We link to the originals rather than embedding
+          the text — PDFs and party pages format much better in their native
+          form, and the source quotes in the Topics + Policy positions
+          sections above already give readers verbatim excerpts to verify
+          our analysis against. */}
       {(c.enhanced_manifesto_text || c.manifesto_text) && (
         <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
           <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100">
-            Full manifesto
+            Manifesto sources
           </h2>
-          {hasEnhanced && c.enhanced_manifesto_source_url ? (
-            <>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                Extended platform sourced from{" "}
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-5 leading-relaxed">
+            The topic and stance analysis above is derived from the text of
+            the source manifesto{hasEnhanced ? "s" : ""} below. We link to the
+            original{hasEnhanced ? "s" : ""} rather than embedding the
+            text — they format better in their native form, and the source
+            quotes attached to each topic and policy position above already
+            give you verbatim excerpts to check our reading against.
+          </p>
+
+          <ul className="space-y-3">
+            {hasEnhanced && c.enhanced_manifesto_source_url && (
+              <li className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                  Used for analysis ·{" "}
+                  {sourceLabelWithFormat(
+                    enhancedSourceLabel ?? "Web source",
+                    c.enhanced_manifesto_source_url,
+                  )}
+                </p>
                 <a
                   href={c.enhanced_manifesto_source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:text-red-700"
+                  className="text-red-700 underline hover:no-underline font-medium break-all"
                 >
-                  {enhancedSourceLabel}
+                  {c.enhanced_manifesto_source_url}
                 </a>
-                {c.enhanced_manifesto_fetched_at && (
-                  <>
-                    {" "}
-                    on{" "}
-                    {new Date(
-                      c.enhanced_manifesto_fetched_at,
-                    ).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </>
-                )}
-                . The topic and stance analysis above is derived from this text.
-              </p>
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                {c.enhanced_manifesto_text}
-              </div>
-              {c.manifesto_text && (
-                <details className="mt-6 border-t border-gray-100 dark:border-zinc-800 pt-4">
-                  <summary className="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-red-700">
-                    Show original vote.je listing ({c.manifesto_word_count ?? 0}{" "}
-                    words)
-                  </summary>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 mb-3">
-                    Scraped from{" "}
-                    <a
-                      href={c.profile_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-red-700"
-                    >
-                      vote.je
-                    </a>{" "}
-                    on{" "}
-                    {new Date(c.scraped_at).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                    .
-                  </p>
-                  <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-600 dark:text-gray-400">
-                    {c.manifesto_text}
-                  </div>
-                </details>
-              )}
-            </>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                Scraped from{" "}
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {(c.enhanced_manifesto_word_count ?? 0).toLocaleString()}{" "}
+                  words
+                  {c.enhanced_manifesto_fetched_at && (
+                    <>
+                      {" · fetched on "}
+                      {new Date(
+                        c.enhanced_manifesto_fetched_at,
+                      ).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </>
+                  )}
+                </p>
+              </li>
+            )}
+
+            {c.manifesto_text && (
+              <li className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                  {hasEnhanced
+                    ? "Also referenced · vote.je profile"
+                    : "Used for analysis · vote.je profile"}
+                </p>
                 <a
                   href={c.profile_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline hover:text-red-700"
+                  className="text-red-700 underline hover:no-underline font-medium break-all"
                 >
-                  vote.je
-                </a>{" "}
-                on{" "}
-                {new Date(c.scraped_at).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-                .
-              </p>
-              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-                {c.manifesto_text}
-              </div>
-            </>
-          )}
+                  {c.profile_url}
+                </a>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {(c.manifesto_word_count ?? 0).toLocaleString()} words ·
+                  scraped on{" "}
+                  {new Date(c.scraped_at).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
+              </li>
+            )}
+          </ul>
         </section>
       )}
 

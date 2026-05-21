@@ -559,21 +559,67 @@ export default async function MethodologyPage() {
         </ul>
       </Section>
 
-      {/* Question set changelog */}
-      <Section title="Question set changes">
+      {/* Methodology + data changelog */}
+      <Section title="Methodology and data changes">
         <Prose>
           <p>
-            The canonical question list is fixed for an election cycle and
-            versioned in the public repo
-            (<Code>pipeline/canonical_questions.yaml</Code>). When a question is
-            added, removed, or substantively reworded mid-cycle we log the
-            change here so anyone comparing scores across time can see what
-            shifted. Stances on a retired question are deleted from the
-            database; the new question is populated by re-running the LLM
-            stance extraction over every candidate&rsquo;s manifesto.
+            The canonical question list and the source manifestos we analyse
+            are both versioned. When a question is added, removed, or
+            reworded — or when we discover that the source text for a
+            candidate or party was stale or wrong — we log the change here
+            so anyone comparing scores across time can see what shifted.
+            Stances on a retired question are deleted from the database; a
+            refreshed manifesto triggers re-extraction of topics and
+            stances for the affected candidates.
           </p>
         </Prose>
         <ul className="space-y-4 mt-5">
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              21 May 2026 — Data correction (Reform Jersey)
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Refreshed party manifesto from 2022 → 2026
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              On 12 May 2026 we fetched the Reform Jersey manifesto from{" "}
+              <Code>reformjersey.je/manifesto</Code> and stored the text used
+              to analyse all 16 Reform candidates. At that point the page was
+              still serving the party&rsquo;s <em>2022</em> manifesto.
+              Reform has since published its 2026 manifesto as a multi-column
+              print-style PDF. On 21 May we re-fetched the 2026 PDF and
+              re-ran topic + stance extraction for all 16 Reform candidates.
+              Source links on candidate pages point at the 2026 PDF.
+              {" "}
+              <strong>Plain text extraction (pdftotext) garbled the
+              multi-column layout</strong> — it reads rows left-to-right
+              across columns, producing jumbled prose that breaks our
+              verbatim-quote guard. We now extract PDF manifesto text
+              through Claude&rsquo;s native PDF vision support (
+              <Code>pipeline/extract_pdf_claude.py</Code>) which reads each
+              column in order before moving on. The individual{" "}
+              <em>vote.je</em> profile text was not affected by this issue,
+              and remains a secondary source on each candidate&rsquo;s page.
+            </p>
+          </li>
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              21 May 2026 — UI change
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Candidate pages now link to the source manifesto rather than embedding it
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              The full text of each candidate&rsquo;s manifesto was previously
+              dumped into the candidate profile page. We now show a
+              &ldquo;Manifesto sources&rdquo; card that links to the original
+              document (PDF, party site, personal site, or vote.je profile)
+              with word count and fetch date. PDFs render properly in the
+              browser&rsquo;s native viewer instead of as wall-of-text, and
+              the source quotes attached to each topic and policy position
+              continue to provide verbatim evidence.
+            </p>
+          </li>
           <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
               May 2026 — Constitutional &amp; Electoral

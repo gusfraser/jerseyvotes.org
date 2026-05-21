@@ -1,17 +1,16 @@
-"use client";
-
 import Link from "next/link";
 
 /**
- * <TrackedLink> — drop-in replacement for next/link's <Link> that also fires
- * a GA event on click. Use inside server components when you want both the
- * server-rendered href AND a click-tracking event without the full
- * client-side state of the quiz client. Renders a normal <Link> server-side.
+ * <TrackedLink> previously fired a Google Analytics event on click in
+ * addition to navigating. GA was removed for cookie-compliance reasons;
+ * this is now a thin wrapper around next/link's <Link> so call sites don't
+ * need to change. If cookieless event analytics is added later, hook the
+ * onClick in here.
  */
 export function TrackedLink({
   href,
-  event,
-  params,
+  event: _event,
+  params: _params,
   className,
   children,
 }: {
@@ -22,22 +21,7 @@ export function TrackedLink({
   children: React.ReactNode;
 }) {
   return (
-    <Link
-      href={href}
-      className={className}
-      onClick={() => {
-        if (
-          typeof window !== "undefined" &&
-          typeof (window as unknown as { gtag?: unknown }).gtag === "function"
-        ) {
-          (window as unknown as { gtag: (...args: unknown[]) => void }).gtag(
-            "event",
-            event,
-            params ?? {},
-          );
-        }
-      }}
-    >
+    <Link href={href} className={className}>
       {children}
     </Link>
   );

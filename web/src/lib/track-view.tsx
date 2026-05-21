@@ -1,36 +1,16 @@
-"use client";
-
-import { useEffect } from "react";
-
 /**
- * Minimal client component that fires a GA event on mount. Use inside an
- * otherwise-server component when you want to record a view-level fact
- * beyond the default pageview (e.g. candidate slug, methodology section).
+ * Previously fired a Google Analytics event on mount. GA was removed for
+ * cookie-compliance reasons; this is now a no-op wrapper so call sites
+ * (server pages that want to flag a view-level fact) don't need to change.
+ * If cookieless event analytics is added later, hook it in here.
  *
  *   <TrackView event="candidate_profile_viewed" params={{ slug, role }} />
  *
- * Renders nothing. Cheap to drop into a server page.
+ * Renders nothing.
  */
-export function TrackView({
-  event,
-  params,
-}: {
+export function TrackView(_props: {
   event: string;
   params?: Record<string, string | number | boolean>;
 }) {
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      typeof (window as unknown as { gtag?: unknown }).gtag === "function"
-    ) {
-      (window as unknown as { gtag: (...args: unknown[]) => void }).gtag(
-        "event",
-        event,
-        params ?? {},
-      );
-    }
-    // Only fire once per mount — intentional.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   return null;
 }

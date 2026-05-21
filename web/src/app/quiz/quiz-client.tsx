@@ -40,10 +40,10 @@ function slugify(name: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-function trackEvent(name: string, params?: Record<string, string | number | boolean>) {
-  if (typeof window !== "undefined" && typeof (window as unknown as { gtag?: unknown }).gtag === "function") {
-    (window as unknown as { gtag: (...args: unknown[]) => void }).gtag("event", name, params ?? {});
-  }
+function trackEvent(_name: string, _params?: Record<string, string | number | boolean>) {
+  // GA was removed for cookie-compliance reasons. Kept as a no-op so call
+  // sites don't need to change; hook a cookieless event analytics here if
+  // one is added later.
 }
 
 const STORAGE_KEY = "jerseyvotes-quiz";

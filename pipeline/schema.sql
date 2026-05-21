@@ -107,6 +107,10 @@ CREATE TABLE candidates (
     classified_at TIMESTAMPTZ,
     correction_token TEXT UNIQUE,
     correction_state TEXT DEFAULT 'pending',   -- pending/reviewed/disputed
+    -- Set when a candidate self-removes via their token-gated review page.
+    -- All public-facing queries must filter `opted_out_at IS NULL`.
+    -- Soft-delete (not row deletion) so audit + topics/stances FKs are preserved.
+    opted_out_at TIMESTAMPTZ,
     election_year INTEGER NOT NULL DEFAULT 2026
 );
 
@@ -147,5 +151,6 @@ CREATE INDEX idx_candidates_role ON candidates(role);
 CREATE INDEX idx_candidates_incumbent ON candidates(incumbent_member_id);
 CREATE INDEX idx_candidates_election_year ON candidates(election_year);
 CREATE INDEX idx_candidates_enhanced_status ON candidates(enhanced_manifesto_status);
+CREATE INDEX idx_candidates_opted_out ON candidates(opted_out_at) WHERE opted_out_at IS NULL;
 CREATE INDEX idx_candidate_topics_topic ON candidate_topics(topic);
 CREATE INDEX idx_canonical_questions_topic ON canonical_questions(topic);

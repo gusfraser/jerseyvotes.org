@@ -35,22 +35,23 @@ wheels/
 .envrc
 
 # ─── Data files ───────────────────────────────────────────
-# CSVs are mostly bulk data or generated outputs (PII risk).
-# Carve out the ones we actually want to commit as pipeline
-# config — add to this allowlist as new config CSVs appear.
+# Bulk data and generated outputs are excluded by default — most contain
+# PII (emails, tokens) or are too large to belong in git. Add explicit
+# allowlist entries for any pipeline-config file that should be committed.
 *.csv
+*.xlsx
 *.xml
 *.parquet
 *.tsv
 *.jsonl
 !pipeline/incumbent_overrides.csv
 
-# Generated outputs from the pipeline that contain PII/tokens.
-# corrections.csv has every candidate's email + their private
-# correction_token URL — must never end up in git.
-corrections.csv
+# Pipeline-output directories.
 pipeline/out/
 pipeline/output/
+
+# Office lock files (Excel/Word holds these while a file is open).
+~$*
 
 # ─── Logs ─────────────────────────────────────────────────
 *.log
@@ -79,3 +80,5 @@ Desktop.ini
 # Keep .claude/launch.json (shared debug config) committed.
 .claude/settings.local.json
 .claude/*.local.json
+# Per-session worktrees Claude Code creates for isolated agents — local only.
+.claude/worktrees/

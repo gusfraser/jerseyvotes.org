@@ -66,6 +66,7 @@ async function loadCandidate(slug: string): Promise<CandidateFull | null> {
     FROM candidates c
     LEFT JOIN members m ON m.member_id = c.incumbent_member_id
     WHERE c.vote_je_slug = ${slug}
+      AND c.opted_out_at IS NULL
     LIMIT 1
   `) as unknown as CandidateFull[];
   return rows[0] ?? null;

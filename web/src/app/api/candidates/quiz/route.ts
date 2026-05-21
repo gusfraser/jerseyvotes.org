@@ -66,7 +66,7 @@ export async function GET() {
   `;
   const candidateCount = (await sql`
     SELECT COUNT(*)::int AS n FROM candidates
-    WHERE election_year = 2026 AND classified_at IS NOT NULL
+    WHERE election_year = 2026 AND opted_out_at IS NULL AND classified_at IS NOT NULL
   `)[0] as { n: number };
 
   return NextResponse.json({
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
              photo_url, incumbent_member_id, manifesto_word_count, scrape_status
       FROM candidates
       WHERE election_year = 2026
+        AND opted_out_at IS NULL
         AND classified_at IS NOT NULL
     `,
     sql`

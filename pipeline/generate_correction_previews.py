@@ -40,7 +40,9 @@ def main():
     cur.execute('''
         SELECT candidate_id, full_name, role, constituency, party,
                email, correction_token, correction_state,
-               manifesto_word_count, classified_at
+               manifesto_word_count, classified_at,
+               enhanced_manifesto_status, enhanced_manifesto_source_url,
+               enhanced_manifesto_source_label, enhanced_manifesto_word_count
         FROM candidates
         WHERE election_year = %s
         ORDER BY full_name
@@ -53,24 +55,37 @@ def main():
         'candidate_id', 'full_name', 'role', 'constituency', 'party',
         'email', 'preview_url', 'correction_state',
         'manifesto_word_count', 'classified',
+        'enhanced_manifesto_found', 'enhanced_manifesto_url',
+        'enhanced_manifesto_source', 'enhanced_manifesto_word_count',
     ])
 
     missing_email = 0
+    enhanced_found = 0
     for (cand_id, name, role, constituency, party, email,
-         token, state, wc, classified_at) in rows:
+         token, state, wc, classified_at,
+         enh_status, enh_url, enh_label, enh_wc) in rows:
         preview_url = f'{args.host}/candidates/correction/{token}' if token else ''
         if not email:
             missing_email += 1
+        found = enh_status == 'found'
+        if found:
+            enhanced_found += 1
         writer.writerow([
             cand_id, name, role or '', constituency or '', party or '',
             email or '', preview_url, state or 'pending',
             wc or 0, 'yes' if classified_at else 'no',
+            'yes' if found else 'no',
+            enh_url or '' if found else '',
+            enh_label or '' if found else '',
+            enh_wc or 0 if found else 0,
         ])
 
     if args.out != '-':
         out.close()
         print(f'Wrote {len(rows)} rows to {args.out}', file=sys.stderr)
     print(f'{missing_email} candidates have no email on file (require manual contact)',
+          file=sys.stderr)
+    print(f'{enhanced_found} candidates have an enhanced manifesto found on the open web',
           file=sys.stderr)
 
     cur.close()

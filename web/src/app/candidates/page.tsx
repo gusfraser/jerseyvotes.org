@@ -67,6 +67,7 @@ export default async function CandidatesPage({
            ) AS topics
     FROM candidates c
     WHERE c.election_year = 2026
+      AND c.opted_out_at IS NULL
       AND (
         ${constituencyList === null}::boolean
         OR c.constituency = ANY(${constituencyList ?? []}::text[])
@@ -87,9 +88,9 @@ export default async function CandidatesPage({
 
   const filterOptions = await sql`
     SELECT
-      ARRAY(SELECT DISTINCT constituency FROM candidates WHERE election_year = 2026 AND constituency IS NOT NULL ORDER BY 1) AS constituencies,
-      ARRAY(SELECT DISTINCT role FROM candidates WHERE election_year = 2026 AND role IS NOT NULL ORDER BY 1) AS roles,
-      ARRAY(SELECT DISTINCT party FROM candidates WHERE election_year = 2026 AND party IS NOT NULL ORDER BY 1) AS parties,
+      ARRAY(SELECT DISTINCT constituency FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND constituency IS NOT NULL ORDER BY 1) AS constituencies,
+      ARRAY(SELECT DISTINCT role FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND role IS NOT NULL ORDER BY 1) AS roles,
+      ARRAY(SELECT DISTINCT party FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND party IS NOT NULL ORDER BY 1) AS parties,
       ARRAY(SELECT DISTINCT topic FROM candidate_topics ORDER BY 1) AS topics
   `;
   const opts = filterOptions[0] as Record<string, string[]>;

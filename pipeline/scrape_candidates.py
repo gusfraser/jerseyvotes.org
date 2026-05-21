@@ -296,6 +296,8 @@ def upsert_candidate(cur, election_year: int, c: dict, p: dict):
             %(manifesto)s, %(words)s, %(status)s,
             %(token)s, %(year)s, NOW()
         )
+        -- opted_out_at MUST NOT appear in this SET clause: re-scraping an
+        -- opted-out candidate must not silently re-enable them.
         ON CONFLICT (vote_je_slug) DO UPDATE SET
             profile_url = EXCLUDED.profile_url,
             full_name = EXCLUDED.full_name,

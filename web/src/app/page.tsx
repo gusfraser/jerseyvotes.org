@@ -33,10 +33,10 @@ export default async function Home() {
       (SELECT COUNT(*) FROM propositions) as total_propositions,
       (SELECT COUNT(*) FROM vote_divisions) as total_divisions`,
     sql`SELECT
-      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026) as total_candidates,
-      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND incumbent_member_id IS NOT NULL) as incumbents,
-      (SELECT COUNT(DISTINCT constituency) FROM candidates WHERE election_year = 2026 AND constituency IS NOT NULL) as constituency_count,
-      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND classified_at IS NOT NULL) as classified`,
+      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL) as total_candidates,
+      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND incumbent_member_id IS NOT NULL) as incumbents,
+      (SELECT COUNT(DISTINCT constituency) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND constituency IS NOT NULL) as constituency_count,
+      (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND classified_at IS NOT NULL) as classified`,
     sql`SELECT vd.division_id, vd.proposition_title, vd.date, vd.reference,
            vd.pour_count, vd.contre_count, vd.division_stage,
            p.topic_primary, p.source_url

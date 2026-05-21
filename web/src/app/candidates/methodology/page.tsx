@@ -13,12 +13,12 @@ export default async function MethodologyPage() {
   const [statsRow, questionRowsAny] = await Promise.all([
     sql`
       SELECT
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026) AS total,
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND classified_at IS NOT NULL) AS classified,
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND incumbent_member_id IS NOT NULL) AS incumbents,
-        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND scrape_status = 'low_content') AS low_content,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL) AS total,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND classified_at IS NOT NULL) AS classified,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND incumbent_member_id IS NOT NULL) AS incumbents,
+        (SELECT COUNT(*) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL AND scrape_status = 'low_content') AS low_content,
         (SELECT COUNT(*) FROM canonical_questions WHERE election_year = 2026) AS questions,
-        (SELECT MAX(scraped_at) FROM candidates WHERE election_year = 2026) AS last_scrape
+        (SELECT MAX(scraped_at) FROM candidates WHERE election_year = 2026 AND opted_out_at IS NULL) AS last_scrape
     `,
     sql`
       SELECT topic, statement
@@ -476,17 +476,17 @@ export default async function MethodologyPage() {
 
       {/* Correction process */}
       <Section title="Candidate correction process">
-        <Callout title="We are reaching out to candidates now">
-          The candidate classifications are live on the site, and we are
-          contacting each candidate with a private preview so they can flag
-          any errors before polling day. Until the candidate has responded,
-          treat the published figures as our best automated reading of the
-          manifesto, not the candidate&rsquo;s own confirmed positions.
+        <Callout title="Candidates have been emailed">
+          Every candidate listed on the site has been sent a private review
+          link by email so they can verify what we&rsquo;ve extracted from
+          their manifesto. The figures shown are our automated reading of each
+          manifesto, plus any corrections or additions candidates have sent
+          back since.
         </Callout>
         <Prose className="mt-5">
           <p>
-            Each candidate receives a unique token-gated preview link by email.
-            From that preview they can email{" "}
+            Each candidate received a unique token-gated review link. From
+            that link they can email{" "}
             <ExternalLink href="mailto:gus@helix.je">gus@helix.je</ExternalLink>{" "}
             with the profile link and token pre-filled — no form to sign up
             for, no account to create. Every public candidate page also has a
@@ -496,10 +496,31 @@ export default async function MethodologyPage() {
             page accordingly.
           </p>
           <p>
+            <strong>Both corrections and additions are welcome.</strong>{" "}
+            Corrections — where our extraction got a topic or stance wrong —
+            override the LLM&rsquo;s output and are shown on the public page.
+            Additions — a link to a longer manifesto, a personal campaign
+            site, a party policy document, or any other public statement we
+            missed — get folded into the next reclassification pass, so the
+            published topics and stances reflect the fuller source. If you
+            are a candidate and we didn&rsquo;t find your fuller manifesto,
+            send the link.
+          </p>
+          <p>
             When a correction overrides an LLM-extracted stance, the corrected
             value is shown and the original is kept in the database for
             transparency. The methodology cannot be silently changed
             retroactively.
+          </p>
+          <p>
+            <strong>Candidates who don&rsquo;t want to appear on the site
+            can remove themselves directly from their private review link
+            — no email needed.</strong> A confirmation step (typing{" "}
+            <Code>OPT OUT</Code>) prevents accidental triggers. Removed
+            profiles disappear immediately from the candidate index, public
+            profile pages, search results, the quiz, and the sitemap.
+            Re-instatement is by email — write to gus@helix.je and we&rsquo;ll
+            restore the profile within 24 hours.
           </p>
         </Prose>
       </Section>
@@ -513,10 +534,14 @@ export default async function MethodologyPage() {
             show low coverage (C) and should be evaluated cautiously regardless
             of headline %.
           </Limitation>
-          <Limitation title="Single source">
-            We only use the vote.je manifesto text. Hustings, social media,
-            blogs, and prior public statements are not included. A
-            candidate&rsquo;s actual views may be richer than their manifesto.
+          <Limitation title="Limited sources">
+            We use the vote.je manifesto plus, where we could find one, a
+            fuller manifesto from a candidate&rsquo;s personal site, party
+            page, or other public source. Hustings, private social posts,
+            and most journalism are not included. A candidate&rsquo;s actual
+            views may be richer than the sources we have — candidates can
+            email us links to anything we missed (see the correction process
+            above).
           </Limitation>
           <Limitation title="LLM error">
             Even with the verbatim-quote guard, the model can mis-classify

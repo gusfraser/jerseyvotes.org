@@ -573,6 +573,268 @@ export default async function MethodologyPage() {
         </Prose>
       </Section>
 
+      {/* Hustings transcription pipeline */}
+      <Section
+        title="How hustings transcripts are produced"
+        id="hustings-transcription"
+        subtitle="Audio pipeline for the spoken-record channel"
+      >
+        <Prose>
+          <p>
+            We ingest the{" "}
+            <ExternalLink href="https://www.youtube.com/c/VoteJersey">
+              vote.je
+            </ExternalLink>{" "}
+            YouTube hustings videos as a separate spoken-record channel
+            (display-only — see the{" "}
+            <a
+              href="#hustings-quiz-exclusion"
+              className="underline hover:text-red-700"
+            >
+              quiz-exclusion note
+            </a>{" "}
+            below). The audio pipeline is several layers stacked to handle
+            the failure modes each one introduces. Source code is in
+            {" "}<Code>pipeline/hustings_*.py</Code>.
+          </p>
+        </Prose>
+
+        <SubSection title="1. Download & transcribe">
+          <Prose>
+            <p>
+              <Code>yt-dlp</Code> pulls the m4a audio for each event listed
+              in the three vote.je playlists (Senatorial, Connétable, Deputy).
+              We transcribe with{" "}
+              <ExternalLink href="https://huggingface.co/openai/whisper-large-v3">
+                OpenAI Whisper large-v3
+              </ExternalLink>{" "}
+              via{" "}
+              <ExternalLink href="https://github.com/ml-explore/mlx-examples/tree/main/whisper">
+                mlx-whisper
+              </ExternalLink>{" "}
+              (Apple Silicon GPU acceleration; ~5-15× realtime). A
+              Jersey-specific <Code>initial_prompt</Code> biases decoding
+              toward parishes, French loanwords (
+              <em>Connétable</em>, <em>Centenier</em>), and
+              event-specific candidate surnames pulled from{" "}
+              <Code>metadata.yaml</Code>.
+            </p>
+            <p>
+              Whisper-large-v3 has a known failure mode where after a
+              brief pause in speech the decoder can enter a degenerate
+              state, emitting tokens like &ldquo;Sne Sne Sne…&rdquo; with
+              probability ≈ 0. Several anti-loop settings are stacked:{" "}
+              <Code>condition_on_previous_text=False</Code>,
+              {" "}<Code>compression_ratio_threshold=2.0</Code>,
+              {" "}<Code>logprob_threshold=-1.0</Code>,
+              {" "}<Code>no_speech_threshold=0.6</Code>, and a temperature
+              fallback sweep (<Code>0.0 → 1.0</Code>) when any of those
+              gates trip.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="2. Diarisation (who-spoke-when)">
+          <Prose>
+            <p>
+              <ExternalLink href="https://huggingface.co/pyannote/speaker-diarization-3.1">
+                pyannote.audio 3.1
+              </ExternalLink>{" "}
+              produces anonymous <Code>SPEAKER_00..SPEAKER_N</Code>{" "}
+              intervals, which we align against the word-level Whisper
+              output to build &ldquo;same speaker, contiguous time
+              range&rdquo; segments. Per-segment speaker embeddings are
+              computed in the same pass and saved for the identification
+              step.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="3. Speaker identification">
+          <Prose>
+            <p>
+              Mapping pyannote&rsquo;s anonymous labels to candidate names
+              is a four-strategy cascade:
+            </p>
+            <ul className="list-disc list-outside ml-6 mt-2 space-y-2">
+              <li>
+                <strong>Moderator-anchor</strong> — the moderator introduces
+                each candidate by name (&ldquo;Steve Ahier, over to
+                you&rdquo;); the next new speaker label inside ~5s gets
+                anchored to that candidate. In single-candidate events the
+                moderator is identified by their own self-introduction
+                (&ldquo;I&rsquo;m Cathy Kear and I&rsquo;ll be taking us
+                through the proceedings&rdquo;) rather than the
+                talks-most heuristic, which gets it backwards for
+                uncontested races.
+              </li>
+              <li>
+                <strong>Voice-fingerprint library</strong> — each candidate
+                has a pyannote embedding extracted from their vote.je
+                intro video (studio-recorded, 83 of 92 enrolled). Cluster
+                averages are matched against the library by cosine
+                similarity.
+              </li>
+              <li>
+                <strong>Event-local references</strong> — the cleanest
+                trick. Studio intro videos are acoustically mismatched
+                from a parish hall (different mic, room, distance). For
+                every cluster whose moderator-anchor and library
+                fingerprint agree on the candidate, we pull that
+                candidate&rsquo;s longest opening-speech segment from the
+                event itself and use its embedding as a per-event
+                reference. Acoustically matched → much higher cosine
+                scores → much more reliable per-segment matching.
+              </li>
+              <li>
+                <strong>Per-segment voiceprints</strong> — every diarised
+                segment ≥ 1.5 s gets its own embedding. When pyannote
+                merges two real speakers into one cluster (which happens
+                surprisingly often), per-segment matching catches it: each
+                individual segment&rsquo;s voiceprint still cleanly
+                matches its actual speaker, overriding the cluster-level
+                assignment for that segment only.
+              </li>
+            </ul>
+            <p className="mt-3">
+              Speaker overrides in <Code>metadata.yaml</Code>{" "}
+              <Code>speaker_overrides:</Code> let a human relabel any
+              cluster after review.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="4. Jersey-term normalisation">
+          <Prose>
+            <p>
+              Whisper mangles Jersey-specific words in recognisable ways:
+              &ldquo;Connétable&rdquo; → &ldquo;Connacht Hub&rdquo;,
+              &ldquo;St Saviour&rdquo; → &ldquo;St Xavier&rdquo;,
+              &ldquo;St Ouen&rdquo; → &ldquo;St Juan&rdquo;,
+              &ldquo;Honorary Police&rdquo; → &ldquo;Henry Police&rdquo;,
+              &ldquo;Bouley Bay&rdquo; → &ldquo;Bully Bay&rdquo;. We apply
+              two correction layers:
+            </p>
+            <ul className="list-disc list-outside ml-6 mt-2 space-y-2">
+              <li>
+                <strong>Regex substitutions</strong> in{" "}
+                <Code>pipeline/normalise_local_terms.py</Code> — ~150
+                explicit patterns for the unambiguous cases. Deterministic
+                and free. Includes word-boundary anchors so we
+                don&rsquo;t accidentally rewrite real English words.
+              </li>
+              <li>
+                <strong>Jersey-lexicon fuzzy match</strong> in{" "}
+                <Code>pipeline/jersey_lexicon.py</Code> — a curated
+                catalogue of ~120 canonical Jersey terms (parishes,
+                villages, organisations, roles, common Jersey-French
+                surnames). Capitalised phrases in the transcript are
+                fuzzy-matched (Levenshtein) against the lexicon; matches
+                ≥ 88 % similarity auto-apply, 80–88 % flag for review,
+                below 80 % are ignored. Filters guard against
+                false-positive matches against candidate names and common
+                English filler words.
+              </li>
+            </ul>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="5. YouTube auto-caption rescue">
+          <Prose>
+            <p>
+              When Whisper&rsquo;s anti-loop gates fail, the loop
+              collapse leaves a marker pointing the reader at the YouTube
+              video. We then run a rescue pass: YouTube&rsquo;s
+              auto-caption ASR is a different model with different
+              failure modes, and it routinely captures the exact speech
+              Whisper lost. For every &ldquo;[automated transcription
+              failed here…]&rdquo; marker, we extract the matching time
+              range from{" "}
+              <Code>youtube_captions.vtt</Code> (fetched by{" "}
+              <Code>yt-dlp</Code> at download time) and splice it in,
+              clearly labelled as{" "}
+              <Code>[YouTube auto-caption rescue, Ns: …]</Code> so the
+              reader knows the source is a second ASR. About 20 segments
+              across the corpus currently use this rescue path,
+              recovering ~7+ minutes of otherwise-lost speech.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="6. Topic classification">
+          <Prose>
+            <p>
+              Each candidate-attributed segment is sent to Claude Opus
+              4.7 with the same prompt skeleton used for manifestos. The
+              model returns JSON with topic + salience + summary +
+              source-quote. Every <Code>source_quote</Code> must
+              substring-match the segment (after light normalisation) or
+              it gets dropped — same verbatim-quote guard as the
+              manifesto pipeline. No stance extraction code path touches
+              hustings: hustings can&rsquo;t affect the matcher quiz.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="Transcript provenance badges">
+          <Prose>
+            <p>
+              Each event displays one of two badges so readers know how
+              the transcript was produced:
+            </p>
+            <ul className="list-disc list-outside ml-6 mt-2 space-y-1">
+              <li>
+                <strong>Hand-cleaned</strong> (green) — transcribed and
+                speaker-attributed manually. Two events at present (the
+                early hand-typed transcripts from before the auto
+                pipeline existed).
+              </li>
+              <li>
+                <strong>Auto-pipeline</strong> (amber) — full automated
+                run via the steps above with no manual review of
+                attribution. Most events.
+              </li>
+              <li>
+                <strong>Auto-pipeline + reviewed</strong> (blue) —
+                automated then human-reviewed via{" "}
+                <Code>pipeline/hustings_review.py</Code>.
+              </li>
+            </ul>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="Dispute & removal">
+          <Prose id="hustings-quiz-exclusion">
+            <p>
+              Unlike vote.je manifesto text — which the candidate wrote —
+              hustings transcripts were produced by jerseyvotes.org and
+              were never signed off by the candidate. Speaker attribution
+              and Whisper transcription can both be wrong. If a candidate
+              spots something attributed to them incorrectly (wrong
+              speaker, mistranscribed phrase, missing context), they can
+              email{" "}
+              <a
+                href="mailto:gus@helix.je"
+                className="underline hover:text-red-700"
+              >
+                gus@helix.je
+              </a>{" "}
+              and we&rsquo;ll remove or correct the segment within
+              24&nbsp;hours pending review.
+            </p>
+            <p className="mt-3">
+              <strong>
+                Hustings are never used to score the matcher quiz.
+              </strong>{" "}
+              Candidates can&rsquo;t choose which audience questions get
+              asked; conflating audience-chosen topics with
+              manifesto-based stance scoring would silently bias the
+              quiz. The spoken record is display-only.
+            </p>
+          </Prose>
+        </SubSection>
+      </Section>
+
       {/* Limitations */}
       <Section title="Known limitations">
         <ul className="space-y-4 mt-2">
@@ -582,14 +844,48 @@ export default async function MethodologyPage() {
             show low coverage (C) and should be evaluated cautiously regardless
             of headline %.
           </Limitation>
-          <Limitation title="Limited sources">
-            We use the vote.je manifesto plus, where we could find one, a
-            fuller manifesto from a candidate&rsquo;s personal site, party
-            page, or other public source. Hustings, private social posts,
-            and most journalism are not included. A candidate&rsquo;s actual
-            views may be richer than the sources we have — candidates can
-            email us links to anything we missed (see the correction process
-            above).
+          <Limitation title="Limited sources for matcher scoring">
+            The topic and stance analysis used by the quiz draws on the
+            vote.je manifesto plus, where we could find one, a fuller
+            manifesto from a candidate&rsquo;s personal site, party page,
+            or other public source. Private social posts and most journalism
+            are not included.{" "}
+            <Link href="/hustings" className="underline hover:text-red-700">
+              Hustings transcripts
+            </Link>{" "}
+            are now ingested but kept on a separate spoken-record channel —
+            see the next limitation. A candidate&rsquo;s actual views may be
+            richer than the sources we have; candidates can email us links
+            to anything we missed (see the correction process above).
+          </Limitation>
+          <Limitation title="Hustings transcripts (spoken record)">
+            We transcribe vote.je YouTube hustings videos using an automated
+            audio pipeline (Whisper + pyannote diarisation) with human review
+            of speaker attribution, and tag each segment with the 16-topic
+            taxonomy. <strong>This material is display-only.</strong> It
+            appears on each candidate&rsquo;s profile under &ldquo;Hustings
+            appearances&rdquo; and on the{" "}
+            <Link href="/hustings" className="underline hover:text-red-700">
+              /hustings index
+            </Link>
+            , but is{" "}
+            <strong>never used to score the matcher quiz</strong>.
+            Candidates can&rsquo;t choose which audience questions they
+            get; conflating questions chosen by an audience with
+            manifesto-based scoring would silently bias the matcher.
+            <br />
+            The verbatim-quote guard still applies: every source quote
+            attached to a hustings topic tag must substring-match the
+            transcript. Unlike manifesto text, the transcript itself was
+            produced by jerseyvotes.org and not signed off by the
+            candidate; candidates can email{" "}
+            <a
+              href="mailto:gus@helix.je"
+              className="underline hover:text-red-700"
+            >
+              gus@helix.je
+            </a>{" "}
+            to dispute or remove any segment within 24 hours.
           </Limitation>
           <Limitation title="LLM error">
             Even with the verbatim-quote guard, the model can mis-classify
@@ -622,6 +918,34 @@ export default async function MethodologyPage() {
           </p>
         </Prose>
         <ul className="space-y-4 mt-5">
+          <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+              23 May 2026 — Hustings transcripts added
+            </p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 font-semibold mb-1">
+              Vote.je YouTube hustings ingested as a separate spoken-record channel
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+              Transcripts of vote.je hustings panels (parish Constable, Deputy
+              constituency, and Senator events) are now ingested via an
+              automated pipeline (yt-dlp + Whisper large-v3 + pyannote
+              diarisation, with a human review of speaker attribution).
+              Each candidate&rsquo;s opening speech and verbatim answers
+              appear on their profile under &ldquo;Hustings appearances&rdquo;,
+              and the full event renders at{" "}
+              <Link href="/hustings" className="underline hover:text-red-700">
+                /hustings
+              </Link>
+              .{" "}
+              <strong>This material is intentionally excluded from the
+              matcher quiz</strong> — candidates can&rsquo;t choose what an
+              audience asks them, so blending hustings into scoring would
+              silently bias the result. Topic tags reuse the existing
+              16-category taxonomy; the verbatim-quote guard applies to the
+              transcript text. Candidates can request removal of any
+              individual segment within 24 hours.
+            </p>
+          </li>
           <li className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
               21 May 2026 — Privacy + opt-out + analytics changes
@@ -841,14 +1165,19 @@ export default async function MethodologyPage() {
 function Section({
   title,
   subtitle,
+  id,
   children,
 }: {
   title: string;
   subtitle?: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-14 pt-8 border-t border-gray-200 dark:border-zinc-800">
+    <section
+      id={id}
+      className="mt-14 pt-8 border-t border-gray-200 dark:border-zinc-800 scroll-mt-20"
+    >
       <div className="flex items-baseline justify-between gap-4 mb-5 flex-wrap">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
           {title}
@@ -882,12 +1211,17 @@ function SubSection({
 function Prose({
   children,
   className = "",
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <div className={`space-y-3 text-gray-700 dark:text-gray-300 leading-relaxed ${className}`}>
+    <div
+      id={id}
+      className={`space-y-3 text-gray-700 dark:text-gray-300 leading-relaxed scroll-mt-20 ${className}`}
+    >
       {children}
     </div>
   );

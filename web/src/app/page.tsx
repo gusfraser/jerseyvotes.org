@@ -27,7 +27,7 @@ const JERSEY_CONSTITUENCIES = [
 export default async function Home() {
   const days = daysUntilElection();
 
-  const [statsResult, candidateStats, recentVotes] = await Promise.all([
+  const [statsResult, candidateStats, recentVotes, hustingsStatsRows] = await Promise.all([
     sql`SELECT
       (SELECT COUNT(*) FROM members WHERE is_currently_active) as active_members,
       (SELECT COUNT(*) FROM propositions) as total_propositions,
@@ -44,6 +44,10 @@ export default async function Home() {
          JOIN propositions p ON vd.proposition_id = p.proposition_id
          WHERE vd.division_stage IN ('principles', 'third_reading')
          ORDER BY vd.date DESC LIMIT 6`,
+    sql`SELECT
+      (SELECT COUNT(*)::int FROM hustings_events WHERE election_year = 2026) AS sessions,
+      (SELECT COALESCE(SUM(duration_seconds), 0)::int FROM hustings_events WHERE election_year = 2026) AS total_seconds,
+      (SELECT COUNT(DISTINCT candidate_id)::int FROM hustings_segments WHERE candidate_id IS NOT NULL) AS candidates_with_speech`,
   ]);
 
   const stats = statsResult[0];
@@ -51,6 +55,16 @@ export default async function Home() {
   const totalCandidates = Number(cstats?.total_candidates ?? 0);
   const incumbentCount = Number(cstats?.incumbents ?? 0);
   const hasCandidateData = totalCandidates > 0;
+
+  const hustats = hustingsStatsRows[0] as {
+    sessions: number;
+    total_seconds: number;
+    candidates_with_speech: number;
+  };
+  const hustingsSessions = Number(hustats?.sessions ?? 0);
+  const hustingsHours = Number(hustats?.total_seconds ?? 0) / 3600;
+  const hustingsCandidatesSpeaking = Number(hustats?.candidates_with_speech ?? 0);
+  const hasHustings = hustingsSessions > 0;
 
   return (
     <div>
@@ -115,6 +129,38 @@ export default async function Home() {
               Read how we score candidates
             </TrackedLink>
           </p>
+
+          {hasHustings && (
+            <TrackedLink
+              href="/hustings"
+              event="home_cta_clicked"
+              params={{ cta: "browse_hustings" }}
+              className="mt-8 block bg-white/10 border border-white/20 rounded-lg p-4 hover:bg-white/15 transition-colors"
+            >
+              <p className="text-xs uppercase tracking-wide text-red-200 mb-2">
+                New: hustings transcripts
+              </p>
+              <p className="text-base sm:text-lg text-white leading-snug">
+                <strong className="tabular-nums">{hustingsSessions}</strong> hustings{" "}
+                {hustingsSessions === 1 ? "session" : "sessions"} transcribed
+                {hustingsHours >= 0.5 && (
+                  <>
+                    {" — "}
+                    <strong className="tabular-nums">
+                      {hustingsHours < 10
+                        ? hustingsHours.toFixed(1)
+                        : Math.round(hustingsHours)}
+                    </strong>
+                    {" hours of audio captured across "}
+                    <strong className="tabular-nums">{hustingsCandidatesSpeaking}</strong>
+                    {" candidates"}
+                  </>
+                )}
+                . Browse what each candidate said when audiences chose the
+                questions &rarr;
+              </p>
+            </TrackedLink>
+          )}
         </div>
       </section>
 

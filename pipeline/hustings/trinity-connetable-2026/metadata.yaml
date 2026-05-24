@@ -1,0 +1,15 @@
+event_slug: trinity-connetable-2026
+title: Connétable of Trinity Hustings 2026
+role: Connétable
+constituency: Trinity
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=XjZEoiVMs0I
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/trinity-connetable-2026/transcript.md
+candidates:
+- name: Andy Howell
+  vote_je_slug: andy-howell-2
+- name: Steve De Louche
+  vote_je_slug: steve-de-louche
+moderator_names:
+- Cathy Kear

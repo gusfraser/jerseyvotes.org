@@ -1,0 +1,22 @@
+event_slug: st-helier-connetable-2026
+title: Connétable of St Helier Hustings 2026
+role: Connétable
+constituency: St Helier
+election_year: 2026
+event_date: 2026-05-06
+youtube_url: https://www.youtube.com/watch?v=X98Z60MSRXs
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-helier-connetable-2026/transcript.md
+transcript_method: hand_cleaned
+candidates:
+- name: Alvin Aaron
+  vote_je_slug: alvin-aaron-2
+- name: David Warr
+  vote_je_slug: david-warr
+- name: Inna Gardiner
+  vote_je_slug: inna-gardiner-4
+- name: Mark Le Chevalier
+  vote_je_slug: mark-le-chevalier
+- name: Rob Ward
+  vote_je_slug: rob-ward-2
+moderator_names:
+- Hannah Shelswell

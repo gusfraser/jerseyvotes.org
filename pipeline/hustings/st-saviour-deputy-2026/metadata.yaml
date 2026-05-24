@@ -1,0 +1,21 @@
+event_slug: st-saviour-deputy-2026
+title: Deputy of St Saviour Hustings 2026
+role: Deputy
+constituency: St Saviour
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=xvSdcNictEE
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-saviour-deputy-2026/transcript.md
+candidates:
+- name: Chris Leck
+  vote_je_slug: chris-leck
+- name: Louise Doublet
+  vote_je_slug: louise-doublet-4
+- name: Malcolm Ferey
+  vote_je_slug: malcolm-ferey-2
+- name: Raluca Kovacs
+  vote_je_slug: raluca-kovacs-2
+- name: Robert Parker
+  vote_je_slug: robert-parker
+moderator_names:
+- Cathy Kear

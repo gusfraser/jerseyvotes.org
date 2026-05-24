@@ -1,0 +1,24 @@
+event_slug: st-helier-north-deputy-2026
+title: Deputy of St Helier North Hustings 2026
+role: Deputy
+constituency: St Helier North
+election_year: 2026
+event_date: 2026-05-13
+youtube_url: https://www.youtube.com/watch?v=Jwz5rf2GZso
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-helier-north-deputy-2026/transcript.md
+transcript_method: hand_cleaned
+candidates:
+- name: Gerald Voisin
+  vote_je_slug: gerald-voisin
+- name: Ian Barnes
+  vote_je_slug: ian-barnes
+- name: Kevin O’Connell
+  vote_je_slug: kevin-oconnell
+- name: Max Andrews
+  vote_je_slug: max-andrews-2
+- name: Steve Ahier
+  vote_je_slug: steve-ahier-3
+- name: Victoria Li
+  vote_je_slug: victoria-li
+moderator_names:
+- Moderator

@@ -1,0 +1,25 @@
+event_slug: st-clement-deputy-2026
+title: Deputy of St Clement Hustings 2026
+role: Deputy
+constituency: St Clement
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=zx_tci-2M-A
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-clement-deputy-2026/transcript.md
+candidates:
+- name: Alex Curtis
+  vote_je_slug: alex-curtis-2
+- name: Barbara Ward
+  vote_je_slug: barbara-ward-2
+- name: Joanne Vandermerwe-Mahon
+  vote_je_slug: joanne-vandermerwe-mahon
+- name: Karen Wilson
+  vote_je_slug: karen-wilson-2
+- name: Lindsay Ash
+  vote_je_slug: lindsay-ash-3
+- name: Mick Robbins
+  vote_je_slug: mick-robbins
+- name: Noah Jervis
+  vote_je_slug: noah-jervis
+moderator_names:
+- Cathy Kear

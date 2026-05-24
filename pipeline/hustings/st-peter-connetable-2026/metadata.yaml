@@ -1,0 +1,13 @@
+event_slug: st-peter-connetable-2026
+title: Connétable of St Peter Hustings 2026
+role: Connétable
+constituency: St Peter
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=nt_8euzZWV8
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-peter-connetable-2026/transcript.md
+candidates:
+- name: Richard Vibert
+  vote_je_slug: richard-vibert-3
+moderator_names:
+- Cathy Kear

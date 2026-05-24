@@ -1,0 +1,15 @@
+event_slug: st-brelade-connetable-2026
+title: Connétable of St Brelade Hustings 2026
+role: Connétable
+constituency: St Brelade
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=6zivVY9_2PQ
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-brelade-connetable-2026/transcript.md
+candidates:
+- name: Mike Jackson
+  vote_je_slug: mike-jackson
+- name: Steve Pallett
+  vote_je_slug: steve-pallett-2
+moderator_names:
+- Cathy Kear

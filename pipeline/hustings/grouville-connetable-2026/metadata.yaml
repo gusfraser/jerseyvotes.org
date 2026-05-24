@@ -1,0 +1,13 @@
+event_slug: grouville-connetable-2026
+title: Connétable of Grouville Hustings 2026
+role: Connétable
+constituency: Grouville
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=DjQi7kCyTGc
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/grouville-connetable-2026/transcript.md
+candidates:
+- name: Mark Labey
+  vote_je_slug: mark-labey-2
+moderator_names:
+- Hannah Shelswell

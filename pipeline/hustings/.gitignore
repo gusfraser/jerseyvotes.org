@@ -1,0 +1,23 @@
+# Pipeline-produced artefacts are NOT committed to git. The canonical
+# committed artefact for each event is transcript.md (plus metadata.yaml).
+# Everything below is regenerable from the YouTube URL + transcript.md.
+
+# yt-dlp output
+audio.m4a
+video_metadata.json
+youtube_captions.vtt
+
+# faster-whisper output
+words.json
+transcript.txt
+
+# pyannote output
+diarised_segments.json
+speaker_embeddings.npz
+
+# Sandbox / experimental runs (e.g. sthelier-connetable-2026-auto/)
+*-auto/
+
+# Per-candidate voice fingerprint library — sensitive (uniquely identifies
+# voices). Stays local.
+_voice_embeddings/

@@ -1,0 +1,19 @@
+event_slug: trinity-meeting-st-john-st-lawrence-and-trinity-deputy-2026
+title: Deputy of St John, St Lawrence and Trinity Hustings 2026 (Trinity meeting)
+role: Deputy
+constituency: St John, St Lawrence and Trinity
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=XmQBmd4kfM8
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/trinity-meeting-st-john-st-lawrence-and-trinity-deputy-2026/transcript.md
+candidates:
+- name: Hilary Jeune
+  vote_je_slug: hilary-jeune-2
+- name: Kirsten Morel
+  vote_je_slug: kirsten-morel-2
+- name: Peter McLinton
+  vote_je_slug: peter-mclinton
+- name: Phil Romeril
+  vote_je_slug: phil-romeril-2
+moderator_names:
+- Gwyn Garfield-Bennett

@@ -1,0 +1,27 @@
+event_slug: st-helier-central-deputy-2026
+title: Deputy of St Helier Central Hustings 2026
+role: Deputy
+constituency: St Helier Central
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=AfCGe608crU
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-helier-central-deputy-2026/transcript.md
+candidates:
+- name: Cameron Monro
+  vote_je_slug: cameron-monro
+- name: Carina Alves
+  vote_je_slug: carina-alves-3
+- name: Catherine Curtis
+  vote_je_slug: catherine-curtis-2
+- name: Claire De Than
+  vote_je_slug: claire-de-than
+- name: John Ttokkallos
+  vote_je_slug: john-ttokkallos
+- name: Lee Carpenter
+  vote_je_slug: lee-carpenter
+- name: Lyndsay Feltham
+  vote_je_slug: lyndsay-feltham-3
+- name: Robin Ward
+  vote_je_slug: robin-ward
+moderator_names:
+- Cathy Kear

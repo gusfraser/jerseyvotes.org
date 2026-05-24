@@ -1,0 +1,45 @@
+event_slug: senatorial-st-lawrence-2026
+title: Senatorial Hustings 2026 (St Lawrence)
+role: Senator
+constituency: null
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=CkILNmgE6o0
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/senatorial-st-lawrence-2026/transcript.md
+candidates:
+- name: Alan Breckon
+  vote_je_slug: alan-breckon
+- name: Alan Le Pavoux
+  vote_je_slug: alan-le-pavoux
+- name: Alan Maclean
+  vote_je_slug: alan-maclean-2
+- name: Bernard Place
+  vote_je_slug: bernard-place
+- name: Elaine Millar
+  vote_je_slug: elaine-millar-2
+- name: Guy de Faye
+  vote_je_slug: guy-de-faye-6
+- name: Helen Miles
+  vote_je_slug: helen-miles-2
+- name: Ian Gorst
+  vote_je_slug: ian-gorst-4
+- name: Karl Busch
+  vote_je_slug: karl-busch-2
+- name: Lyndon Farnham
+  vote_je_slug: lyndon-farnham-4
+- name: Mark Boleat
+  vote_je_slug: mark-boleat
+- name: Martin Aliga
+  vote_je_slug: martin-aliga
+- name: Mary Le Hegarat
+  vote_je_slug: mary-le-hegarat-2
+- name: Sam Mézec
+  vote_je_slug: sam-mezec-5
+- name: Serena Kersten Guthrie
+  vote_je_slug: serena-kersten-guthrie
+- name: Steve Luce
+  vote_je_slug: steve-luce-4
+- name: Tom Binet
+  vote_je_slug: tom-binet-2
+moderator_names:
+- Hannah Shelswell

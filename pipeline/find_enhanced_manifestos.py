@@ -638,6 +638,14 @@ def main():
 
     where = 'WHERE election_year = %s'
     params: list = [args.election_year]
+    # Never touch rows curated by ingest_manual_manifestos.py — those candidates
+    # don't have a web source the auto-finder could improve on, and overwriting
+    # would silently discard files committed to the repo for transparency.
+    where += (
+        " AND (enhanced_manifesto_source_label IS NULL"
+        " OR enhanced_manifesto_source_label NOT IN"
+        " ('manually_supplied','social_media_capture','printed_handout'))"
+    )
     if requested_names:
         where += ' AND full_name = ANY(%s)'
         params.append(requested_names)

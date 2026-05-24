@@ -50,6 +50,35 @@ wheels/
 pipeline/out/
 pipeline/output/
 
+# ─── Hustings pipeline ────────────────────────────────────
+# Per-event folder layout:
+#   pipeline/hustings/<slug>/
+#     audio.m4a           ← downloaded from YouTube; ~120MB each; regenerable
+#     audio.wav           ← inline conversion for pyannote; regenerable
+#     words.json          ← Whisper output; ~1.5MB; regenerable
+#     diarised_segments.json  ← pyannote output; regenerable
+#     *.npz               ← binary speaker/segment embeddings; regenerable
+#     transcript.txt      ← Whisper plain text; redundant with transcript.md
+#     metadata.yaml       ← KEEP: event config (candidates, moderator)
+#     transcript.md       ← KEEP: the actual displayed content
+#     video_metadata.json ← KEEP: source-URL provenance
+#     youtube_captions.vtt ← KEEP: needed for YouTube rescue replay
+#     .normalised .ingested .classified ← stage markers; local-only
+#
+# Voice library:
+#   pipeline/hustings/_voice_audio/    ← intro-video clips, regenerable
+#   pipeline/hustings/_voice_embeddings/  ← KEEP: .npy fingerprints (small, binary)
+pipeline/hustings/*/audio.m4a
+pipeline/hustings/*/audio.wav
+pipeline/hustings/*/words.json
+pipeline/hustings/*/diarised_segments.json
+pipeline/hustings/*/*.npz
+pipeline/hustings/*/transcript.txt
+pipeline/hustings/*/.normalised
+pipeline/hustings/*/.ingested
+pipeline/hustings/*/.classified
+pipeline/hustings/_voice_audio/
+
 # Office lock files (Excel/Word holds these while a file is open).
 ~$*
 

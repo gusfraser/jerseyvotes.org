@@ -231,6 +231,17 @@ class ParseState:
     current_question_summary: Optional[str] = None
     current_questioner_name: Optional[str] = None
 
+    # Tracks whether a candidate has answered since the last audience flush.
+    # When False, the next audience flush is a *continuation* of the same
+    # question (interruption by moderator, audience pause, etc.) rather than
+    # a brand-new question — pyannote happily splits one audience question
+    # across multiple speaker turns and we don't want each fragment to bump
+    # question_index.
+    candidate_spoke_since_last_audience: bool = False
+    # The most-recent emitted audience_question Segment, so continuation
+    # fragments can append text into it rather than creating a parallel row.
+    current_audience_segment: Optional['Segment'] = None
+
     # accumulator for the currently-open speaker block
     speaker_raw: Optional[str] = None
     speaker_kind: Optional[str] = None  # 'candidate' / 'moderator' / 'audience'
@@ -275,21 +286,47 @@ def parse_transcript(text: str, roster: Roster) -> list[Segment]:
             else:
                 # In questions mode → candidate is answering a question.
                 seg_type = 'question_answer'
+                # A candidate just answered, so the *next* audience speaker
+                # turn is genuinely a new question rather than a
+                # continuation of the current one.
+                s.candidate_spoke_since_last_audience = True
         elif s.speaker_kind == 'moderator':
             seg_type = 'moderator'
         elif s.speaker_kind == 'audience':
             seg_type = 'audience_question'
-            # Audience speaker → new question begins. Their body becomes the
-            # question summary for subsequent candidate answers. Also flip
-            # mode to 'questions' so subsequent candidate segments get
-            # tagged as question_answer rather than opening_speech (matters
-            # for auto-generated transcripts that have no section headers).
             s.mode = 'questions'
+            if (not s.candidate_spoke_since_last_audience
+                    and s.current_audience_segment is not None):
+                # Continuation of the same question — pyannote split the
+                # audience turn (moderator interjected, audience paused).
+                # Append the body to the existing audience_question Segment
+                # so the question_index stays attached to the same row.
+                existing = s.current_audience_segment
+                existing.text = (existing.text + ' ' + body).strip()
+                s.current_question_summary = existing.text
+                _reset_speaker(s)
+                return
+            if (s.candidate_spoke_since_last_audience
+                    and len(body) < 30
+                    and s.current_audience_segment is not None):
+                # Brief audience interjection during an answer (e.g.
+                # "things", "so yeah okay", "thank you"). Don't bump
+                # question_index — append to the current question summary
+                # so the words aren't lost, but don't create a new row that
+                # would steal the next candidate's answer.
+                existing = s.current_audience_segment
+                existing.text = (existing.text + ' ' + body).strip()
+                s.current_question_summary = existing.text
+                _reset_speaker(s)
+                return
+            # Genuine new audience question. Bump question_index and make
+            # this Segment the new "current" audience row.
             s.question_index += 1
             s.current_question_summary = body
             s.current_questioner_name = re.sub(
                 AUDIENCE_SUFFIX_RE, '', s.speaker_raw,
             ).strip()
+            s.candidate_spoke_since_last_audience = False
         elif s.speaker_kind == 'unknown_speaker':
             # Diarisation produced a label the identify script couldn't
             # map. Preserve the words verbatim with no candidate_id.
@@ -317,6 +354,8 @@ def parse_transcript(text: str, roster: Roster) -> list[Segment]:
             position_in_event=s.position,
         )
         s.out.append(seg)
+        if seg_type == 'audience_question':
+            s.current_audience_segment = seg
         _reset_speaker(s)
 
     def _reset_speaker(s: ParseState):
@@ -358,6 +397,8 @@ def parse_transcript(text: str, roster: Roster) -> list[Segment]:
                 state.pending_question_label = None
                 state.current_question_summary = None
                 state.current_questioner_name = None
+                state.current_audience_segment = None
+                state.candidate_spoke_since_last_audience = False
             i += 1
             continue
 
@@ -374,6 +415,11 @@ def parse_transcript(text: str, roster: Roster) -> list[Segment]:
             state.question_index = max(state.question_index + 1, qnum)
             state.pending_question_label = qlabel or None
             state.mode = 'questions'   # safe-default; some transcripts skip explicit "Q&A" header
+            # A new explicit question header always starts a fresh audience
+            # question — break the continuation chain so we don't merge into
+            # the previous question's audience row.
+            state.current_audience_segment = None
+            state.candidate_spoke_since_last_audience = False
             i += 1
             continue
 

@@ -32,9 +32,11 @@ type SegmentRow = {
   segment_type: string;
   question_index: number | null;
   question_summary: string | null;
+  question_summary_source: string | null;
   questioner_name: string | null;
   timestamp_seconds: number | null;
   text: string;
+  text_youtube_asr: string | null;
   position_in_event: number;
   topics: { topic: string; salience: number; summary: string | null; source_quote: string | null }[] | null;
 };
@@ -86,8 +88,9 @@ export default async function EventPage({
   // All segments with their topic tags inlined as a JSON array per row.
   const segments = (await sql`
     SELECT s.segment_id, s.candidate_id, s.speaker_name_raw, s.segment_type,
-           s.question_index, s.question_summary, s.questioner_name,
-           s.timestamp_seconds, s.text, s.position_in_event,
+           s.question_index, s.question_summary, s.question_summary_source,
+           s.questioner_name, s.timestamp_seconds, s.text, s.text_youtube_asr,
+           s.position_in_event,
            (
              SELECT COALESCE(json_agg(json_build_object(
                'topic', t.topic, 'salience', t.salience,
@@ -283,12 +286,17 @@ export default async function EventPage({
               const nonResponders = largePanel
                 ? []
                 : candidates.filter((c) => !answeredIds.has(c.candidate_id));
+              const displayName = cleanQuestionerName(q.questioner_name);
+              const headline = q.question_summary?.trim() || q.text;
+              const isSynthesised = q.question_summary_source === "llm_synthesised"
+                && !!q.question_summary?.trim();
+              const verbatim = (q.text_youtube_asr || q.text || "").trim();
               return (
                 <article key={q.segment_id}>
                   <header className="mb-3">
                     <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
                       Question {idx + 1}
-                      {q.questioner_name && ` · ${q.questioner_name}`}
+                      {displayName && ` · ${displayName}`}
                       {q.timestamp_seconds !== null && ev.youtube_url && (
                         <>
                           {" · "}
@@ -304,8 +312,18 @@ export default async function EventPage({
                       )}
                     </p>
                     <blockquote className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed border-l-4 border-gray-200 dark:border-zinc-700 pl-3 italic">
-                      {q.text}
+                      {headline}
                     </blockquote>
+                    {isSynthesised && verbatim && verbatim !== headline && (
+                      <details className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <summary className="cursor-pointer hover:text-red-700 select-none">
+                          As captured from audio
+                        </summary>
+                        <p className="mt-1 pl-3 border-l-2 border-gray-100 dark:border-zinc-800 leading-relaxed">
+                          {verbatim}
+                        </p>
+                      </details>
+                    )}
                   </header>
                   <div className="space-y-3">
                     {(() => {
@@ -493,6 +511,16 @@ function DidNotRespondRow({
       </span>
     </div>
   );
+}
+
+function cleanQuestionerName(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  // Diarisation labels like <SPEAKER_07> shouldn't reach the UI — when the
+  // identify pass couldn't map the audience speaker to a person, fall back
+  // to the generic label.
+  if (/^<SPEAKER_\d+>$/i.test(trimmed)) return "Audience member";
+  return trimmed;
 }
 
 function formatTime(seconds: number): string {

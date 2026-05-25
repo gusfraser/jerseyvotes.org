@@ -146,7 +146,8 @@ def db_connect():
     )
 
 
-def process_event(folder: Path, conn, cur, dry_run: bool) -> int:
+def process_event(folder: Path, conn, cur, dry_run: bool,
+                  include_hand_cleaned: bool = False) -> int:
     """Splice ASR text into audience_question rows for one event. Returns
     number of rows updated."""
     slug = folder.name
@@ -167,8 +168,14 @@ def process_event(folder: Path, conn, cur, dry_run: bool) -> int:
         print(f'  no hustings_events row for slug={slug}; skipping')
         return 0
     event_id, method, duration = row
-    if method == 'hand_cleaned':
-        print(f'  transcript_method=hand_cleaned; skipping (authoritative)')
+    if method == 'hand_cleaned' and not include_hand_cleaned:
+        # `text` on these events is an LLM-polished version of the raw audio,
+        # so we don't want to overwrite it. But text_youtube_asr is purely
+        # additive — populating it lets the UI show YouTube's caption of what
+        # was actually said in the "as captured from audio" disclosure rather
+        # than falling back to the polished text. Pass --include-hand-cleaned
+        # to opt in.
+        print(f'  transcript_method=hand_cleaned; skipping (pass --include-hand-cleaned to splice anyway)')
         return 0
 
     cues = parse_vtt(vtt)
@@ -252,6 +259,10 @@ def main():
     parser.add_argument('--slug', help='Process only this event slug')
     parser.add_argument('--dry-run', action='store_true',
                         help='Parse and report but do not write to the DB')
+    parser.add_argument('--include-hand-cleaned', action='store_true',
+                        help='Also splice events with transcript_method=hand_cleaned. '
+                             'Safe: text_youtube_asr is additive and does not '
+                             'overwrite the cleaned `text` column.')
     args = parser.parse_args()
 
     if not HUSTINGS_DIR.exists():
@@ -277,7 +288,8 @@ def main():
         for folder in folders:
             print(f'[{folder.name}]')
             try:
-                total += process_event(folder, conn, cur, args.dry_run)
+                total += process_event(folder, conn, cur, args.dry_run,
+                                        include_hand_cleaned=args.include_hand_cleaned)
             except Exception as e:
                 print(f'  ERROR: {e}')
     finally:

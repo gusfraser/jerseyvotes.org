@@ -6,7 +6,7 @@ election_year: 2026
 event_date: 2026-05-13
 youtube_url: https://www.youtube.com/watch?v=Jwz5rf2GZso
 transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-helier-north-deputy-2026/transcript.md
-transcript_method: hand_cleaned
+transcript_method: auto_pipeline
 candidates:
 - name: Gerald Voisin
   vote_je_slug: gerald-voisin

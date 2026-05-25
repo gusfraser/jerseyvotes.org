@@ -155,12 +155,16 @@ export default async function EventPage({
         </p>
         {ev.transcript_method === "auto_pipeline" && (
           <p className="mt-3 text-xs text-amber-700 dark:text-amber-300 leading-relaxed bg-amber-50 dark:bg-amber-900/20 border-l-2 border-amber-400 pl-3 py-1.5">
-            This transcript was produced by an automated pipeline (yt-dlp +
-            Whisper + pyannote) and has not yet been human-reviewed. Expect
-            occasional STT artefacts: dropped {`"I"`} pronouns at sentence
-            starts, mis-attributed speakers, and audience members shown as{" "}
-            <code>&lt;SPEAKER_NN&gt;</code> when the diarisation couldn&apos;t
-            ID them. The YouTube video is always the ground truth.
+            This transcript was produced by an automated pipeline — YouTube
+            audio transcribed with Whisper, speakers separated with pyannote,
+            audience-question summaries written by Claude. It has not been
+            human-reviewed. Expect occasional STT artefacts in candidate
+            answers (dropped {`"I"`} pronouns, mis-attributed speakers) and
+            the occasional unmappable audience speaker shown as{" "}
+            {`"Audience member"`}. Each audience question&apos;s headline is
+            an LLM summary — click {`"As captured from audio"`} beneath it to
+            see the verbatim YouTube caption. The YouTube video is always the
+            ground truth.
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">

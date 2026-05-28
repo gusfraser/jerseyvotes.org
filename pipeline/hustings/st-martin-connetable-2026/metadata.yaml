@@ -3,11 +3,28 @@ title: Connétable of St Martin Hustings 2026
 role: Connétable
 constituency: St Martin
 election_year: 2026
-event_date: null
+event_date: 2026-05-26
 youtube_url: https://www.youtube.com/watch?v=raTwPVpln2c
 transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-martin-connetable-2026/transcript.md
+transcript_method: auto_pipeline_reviewed
+notes: |
+  Uncontested race — Karen Shenton Stone is the sole candidate. Same
+  failure mode as st-clement-connetable-2026 (PR #12): the auto-identify
+  pass built two voice clusters as expected (one Karen, one Cathy Kear
+  the moderator) but assigned the NAMES to the wrong clusters. The
+  original "(Moderator):" segments were actually Karen — including her
+  ~5000-character opening monologue ("I am known for relatively short
+  to the point speeches in the assembly, however this is quite a long
+  speech for me…"), her cost-of-living statement, and the Lidl/Aldi
+  detail — and "<SPEAKER_04>:" was the moderator (literally "evening
+  and welcome to the 2026 election hustings for the Connétable of St
+  Martin. I'm Cathy Kear…"). transcript.md has been hand-swapped to
+  flip them. SPEAKER_06 / SPEAKER_07 left as-is — they're identifiable
+  audience members (John Harvey + one other) but no candidate
+  attribution applies.
 candidates:
 - name: Karen Shenton Stone
   vote_je_slug: karen-shenton-stone-2
-moderator_names: []
+moderator_names:
+- Cathy Kear
 speaker_overrides: {}

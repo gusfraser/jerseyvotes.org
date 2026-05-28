@@ -657,6 +657,15 @@ def process_event(folder: Path, dry_run: bool, conn, cur) -> tuple[int, int]:
     # (hand-supplied for events without an audio source).
     duration_seconds = _resolve_duration(folder, meta)
 
+    # Event date from video_metadata.json (release_date is when the
+    # live stream started — the actual hustings night — preferred over
+    # upload_date which is when YouTube finished processing, often
+    # past midnight in a different timezone). Explicit event_date in
+    # metadata.yaml wins so hand-cleaned events stay authoritative.
+    resolved_date = _resolve_event_date(folder, meta)
+    if resolved_date and not meta.get('event_date'):
+        meta = {**meta, 'event_date': resolved_date}
+
     source_md_path = str(transcript_path.relative_to(Path(__file__).resolve().parent.parent))
     event_id = upsert_event(cur, meta, source_md_path, duration_seconds)
     write_segments(cur, event_id, segments, slug_to_id)
@@ -685,6 +694,39 @@ def _resolve_duration(folder: Path, meta: dict) -> int | None:
         except (TypeError, ValueError):
             return None
     return None
+
+
+def _resolve_event_date(folder: Path, meta: dict) -> str | None:
+    """Return the hustings event date as 'YYYY-MM-DD'.
+
+    Order of precedence:
+      1. metadata.yaml `event_date:` (explicit override)
+      2. video_metadata.json release_date (start of the live broadcast —
+         the night of the hustings)
+      3. video_metadata.json upload_date (end of upload — usually a few
+         hours later, possibly past midnight UTC; less accurate but a
+         reasonable fallback)
+
+    Returns None when no signal is available. yt-dlp's release_date /
+    upload_date are YYYYMMDD strings; we reformat to YYYY-MM-DD so the
+    psycopg2 driver auto-casts to PG `date`.
+    """
+    if meta.get('event_date'):
+        # Could already be a `date` (psycopg2 round-trip) or a string —
+        # caller passes it straight to PG either way.
+        return meta['event_date']
+    video_meta = folder / 'video_metadata.json'
+    if not video_meta.exists():
+        return None
+    try:
+        import json
+        d = json.loads(video_meta.read_text())
+    except Exception:
+        return None
+    raw = d.get('release_date') or d.get('upload_date')
+    if not raw or not isinstance(raw, str) or len(raw) != 8 or not raw.isdigit():
+        return None
+    return f'{raw[0:4]}-{raw[4:6]}-{raw[6:8]}'
 
 
 def main():

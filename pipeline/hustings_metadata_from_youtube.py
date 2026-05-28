@@ -134,6 +134,70 @@ def derive_event_metadata(title: str) -> dict:
             'suggested_title': f'Deputy of {constituency} Hustings 2026{title_suffix}',
         }
 
+    # LIVE-stream titles: vote.je posts live-streamed hustings with a
+    # temporary title like "LIVE HUSTINGS: Senators, Trinity" or
+    # "LIVE HUSTINGS: Deputy, St. Peter", and only renames to the
+    # canonical form ("Senatorial hustings 2026 at Trinity" /
+    # "Deputies hustings 2026: Deputies of St. Peter") hours or days
+    # later. Matching the informal title here lets the pipeline ingest
+    # the recording the morning after the live, without waiting for
+    # vote.je's editor. The eventual rename produces the same event_slug
+    # so subsequent --all runs are idempotent.
+    m = re.search(r'\bLIVE\s+HUSTINGS\s*:\s*Senators?\s*,\s*(.+)$', t, re.IGNORECASE)
+    if m:
+        location = m.group(1).strip().rstrip('.')
+        role = 'Senator'
+        constituency = None
+        event_slug = f'senatorial-{_slugify(location)}-2026'
+        return {
+            'role': role,
+            'constituency': constituency,
+            'location': location,
+            'event_slug': event_slug,
+            'suggested_title': f'Senatorial Hustings 2026 ({location})',
+        }
+
+    m = re.search(r'\bLIVE\s+HUSTINGS\s*:\s*Conn[ée]tables?\s*,\s*(.+)$', t, re.IGNORECASE)
+    if m:
+        parish = _canonical_parish(m.group(1).strip().rstrip('.'))
+        role = 'Connétable'
+        constituency = parish
+        event_slug = f'{_slugify(parish)}-connetable-2026'
+        return {
+            'role': role,
+            'constituency': constituency,
+            'location': parish,
+            'event_slug': event_slug,
+            'suggested_title': f'Connétable of {parish} Hustings 2026',
+        }
+
+    m = re.search(r'\bLIVE\s+HUSTINGS\s*:\s*Deput(?:y|ies)\s*,\s*(.+)$', t, re.IGNORECASE)
+    if m:
+        raw = m.group(1).strip().rstrip('.')
+        # The LIVE title gives a single parish like "St. Peter". For
+        # standalone Deputy constituencies (St Brelade / St Clement /
+        # St Saviour / St Helier {North,Central,South}) that's the
+        # whole constituency; for the multi-parish constituencies the
+        # parish names a separate meeting of the wider constituency
+        # (e.g. "St. Peter" = St Peter meeting of "St Mary, St Ouen
+        # and St Peter"). Resolve which case this is so the slug
+        # mirrors the canonical multi-meeting pattern used elsewhere
+        # (e.g. st-peter-meeting-st-mary-st-ouen-and-st-peter-deputy-2026).
+        constituency, meeting_suffix = _resolve_deputy_constituency(raw)
+        role = 'Deputy'
+        slug_parts = [_slugify(constituency), 'deputy', '2026']
+        if meeting_suffix:
+            slug_parts.insert(0, _slugify(meeting_suffix) + '-meeting')
+        event_slug = '-'.join(slug_parts)
+        title_suffix = f' ({meeting_suffix} meeting)' if meeting_suffix else ''
+        return {
+            'role': role,
+            'constituency': constituency,
+            'location': meeting_suffix or constituency,
+            'event_slug': event_slug,
+            'suggested_title': f'Deputy of {constituency} Hustings 2026{title_suffix}',
+        }
+
     raise ValueError(f'unrecognised hustings title pattern: {title!r}')
 
 
@@ -156,18 +220,51 @@ def _canonical_constituency(s: str) -> str:
     """Parishes are 1:1; multi-parish constituencies normalised to known
     canonical names; otherwise return cleaned input."""
     s = normalise_parish(s)
-    canonical_multi = [
-        'St John, St Lawrence and Trinity',
-        'Grouville and St Martin',
-        'St Mary, St Ouen and St Peter',
-        'St Helier North',
-        'St Helier Central',
-        'St Helier South',
-    ]
-    for name in canonical_multi + PARISHES:
+    for name in list(_CANONICAL_MULTI_DEPUTY) + PARISHES:
         if s.lower() == name.lower():
             return name
     return s
+
+
+# Standalone Deputy constituencies for 2026 (single-parish or
+# single-district, contested as one seat group). St Helier North/
+# Central/South are *districts* of St Helier but are deputy
+# constituencies in their own right.
+_STANDALONE_DEPUTY = (
+    'St Brelade', 'St Clement', 'St Saviour',
+    'St Helier North', 'St Helier Central', 'St Helier South',
+)
+
+# Multi-parish Deputy constituencies. These run separate meetings in
+# each constituent parish (e.g. "Deputies of St Mary, St Ouen and
+# St Peter: St Peter") so the parish in a LIVE-stream title is a
+# meeting suffix, not the constituency.
+_CANONICAL_MULTI_DEPUTY = (
+    'St John, St Lawrence and Trinity',
+    'Grouville and St Martin',
+    'St Mary, St Ouen and St Peter',
+)
+
+
+def _resolve_deputy_constituency(raw: str) -> tuple[str, str]:
+    """Resolve a parish/constituency token from a LIVE-stream Deputy
+    title into (canonical_constituency, meeting_suffix).
+
+      - "St Brelade"  → ("St Brelade", "")            standalone
+      - "St Peter"    → ("St Mary, St Ouen and St Peter", "St Peter")
+      - "Grouville"   → ("Grouville and St Martin", "Grouville")
+      - "Trinity"     → ("St John, St Lawrence and Trinity", "Trinity")
+
+    Falls back to the cleaned input as a standalone constituency if no
+    mapping fits, to keep the parser monotonically permissive."""
+    canon = _canonical_constituency(raw)
+    if canon in _STANDALONE_DEPUTY:
+        return canon, ''
+    for multi in _CANONICAL_MULTI_DEPUTY:
+        tokens = re.split(r',\s*|\s+and\s+', multi)
+        if canon in tokens:
+            return multi, canon
+    return canon, ''
 
 
 def db_connect():

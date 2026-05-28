@@ -96,8 +96,21 @@ def fetch_one(event_folder: Path, url: str, force: bool = False) -> None:
     print(f'  $ {" ".join(cmd)}')
     proc = subprocess.run(cmd, check=False)
     if proc.returncode != 0:
-        print(f'  yt-dlp failed (exit {proc.returncode})')
-        return
+        # yt-dlp often exits non-zero on LIVE-stream recordings because
+        # the DASH subtitle fragments fail mid-download even though the
+        # audio download succeeded. Don't bail here — fall through to the
+        # rename + audio.m4a existence check, which is the real signal.
+        print(f'  yt-dlp exited with code {proc.returncode} '
+              '(continuing — checking for audio file)')
+
+    # Clean up any partial subtitle fragments left behind by a failed
+    # DASH subtitle download so they don't confuse the rename loop or
+    # downstream stages.
+    for stale in event_folder.iterdir():
+        if stale.is_file() and (
+            stale.name.endswith('.vtt.part') or stale.name.endswith('.vtt.ytdl')
+        ):
+            stale.unlink()
 
     # yt-dlp writes files named after the video title — rename to the
     # canonical fixed names so downstream stages don't have to guess.

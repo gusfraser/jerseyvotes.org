@@ -15,6 +15,15 @@ transcript.txt
 diarised_segments.json
 speaker_embeddings.npz
 
+# hustings_batch.py stage-completion markers (local-only — re-runs
+# look at the canonical artefacts above, but the markers let the
+# batch driver skip stages cheaply).
+.normalised
+.ingested
+.classified
+.spliced
+.summarised
+
 # Sandbox / experimental runs (e.g. sthelier-connetable-2026-auto/)
 *-auto/
 

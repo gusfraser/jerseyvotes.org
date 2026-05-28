@@ -2,14 +2,22 @@
 End-to-end batch driver for all 2026 hustings videos on vote.je's YouTube.
 
 For each video in a playlist, runs the full pipeline:
-  1. metadata_from_youtube  → metadata.yaml (auto-roster from candidates DB)
-  2. hustings_fetch         → audio.m4a, audio.wav, video_metadata.json
-  3. hustings_transcribe    → words.json (mlx-whisper on Apple Silicon GPU)
-  4. hustings_diarise       → diarised_segments.json (pyannote on MPS)
-  5. hustings_identify      → transcript.md (speaker→candidate mapping)
-  6. normalise_local_terms  → fixes STT garbles of local names
-  7. ingest_hustings        → hustings_events + hustings_segments rows
-  8. classify_hustings      → hustings_segment_topics (Claude Opus, only new segments)
+   1. metadata_from_youtube      → metadata.yaml (auto-roster from candidates DB)
+   2. hustings_fetch             → audio.m4a, audio.wav, video_metadata.json,
+                                   youtube_captions.vtt
+   3. hustings_transcribe        → words.json (mlx-whisper on Apple Silicon GPU)
+   4. hustings_diarise           → diarised_segments.json (pyannote on MPS)
+   5. hustings_identify          → transcript.md (speaker→candidate mapping)
+   6. normalise_local_terms      → fixes STT garbles of local names
+   7. ingest_hustings            → hustings_events + hustings_segments rows
+   8. classify_hustings          → hustings_segment_topics (Claude Opus, only
+                                   new segments)
+   9. splice_youtube_asr         → text_youtube_asr for audience_question rows
+                                   so the per-question "as captured from audio"
+                                   disclosure has the YouTube ASR text
+  10. summarise_hustings_questions → LLM-polished one-line headline for every
+                                     audience_question, plus a clean
+                                     questioner_name pulled from the audio
 
 Idempotent — skips events that already have transcript.md unless --force.
 Failures on one event don't stop the batch — they log and continue.
@@ -52,7 +60,7 @@ PLAYLISTS = {
 # Each stage produces a marker file. We skip stages whose marker exists,
 # unless --force-stage <name>. The order here is the run order.
 STAGES = ('metadata', 'fetch', 'transcribe', 'diarise', 'identify',
-          'normalise', 'ingest', 'classify')
+          'normalise', 'ingest', 'classify', 'splice', 'summarise')
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, env_path: bool = True) -> int:
@@ -87,6 +95,8 @@ def needs_stage(folder: Path, stage: str, force: bool) -> bool:
         'normalise':  folder / '.normalised',
         'ingest':     folder / '.ingested',
         'classify':   folder / '.classified',
+        'splice':     folder / '.spliced',
+        'summarise':  folder / '.summarised',
     }
     # Short-circuit the ASR pipeline if the canonical artefact exists.
     if stage in ('transcribe', 'diarise') and (folder / 'transcript.md').exists():
@@ -222,6 +232,38 @@ def process_event(video_id: str, title: str, conn, cur, *,
             print(f'  classify failed (exit {rc}); leaving for manual rerun')
             return False
         touch(folder, '.classified')
+    if stop_here('classify'):
+        return True
+
+    # 9. splice YouTube ASR into audience_question rows. Purely
+    # additive — fills text_youtube_asr for the "as captured from
+    # audio" disclosure on the per-question card. No-op for events
+    # without youtube_captions.vtt (DASH-subtitle download failures
+    # on some LIVE-stream recordings) — script logs and exits 0.
+    if 'splice' not in skip_stages and needs_stage(folder, 'splice', force):
+        rc = run([
+            sys.executable, str(PIPELINE_DIR / 'splice_youtube_asr.py'),
+            '--slug', meta['event_slug'],
+        ])
+        if rc != 0:
+            print(f'  splice failed (exit {rc}); leaving for manual rerun')
+            return False
+        touch(folder, '.spliced')
+    if stop_here('splice'):
+        return True
+
+    # 10. LLM-polish every audience_question into a one-line headline
+    # plus a clean questioner_name. Needs the ingested rows + answer
+    # context, so must run after classify. Costs ~$0.01 per question.
+    if 'summarise' not in skip_stages and needs_stage(folder, 'summarise', force):
+        rc = run([
+            sys.executable, str(PIPELINE_DIR / 'summarise_hustings_questions.py'),
+            '--slug', meta['event_slug'],
+        ])
+        if rc != 0:
+            print(f'  summarise failed (exit {rc}); leaving for manual rerun')
+            return False
+        touch(folder, '.summarised')
 
     return True
 

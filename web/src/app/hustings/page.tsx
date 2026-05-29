@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { sql, TOPICS } from "@/lib/db";
-import { TranscriptMethodBadge } from "./transcript-method-badge";
+import { HustingsFilter } from "./filter";
 
 export const metadata: Metadata = {
   title: "Hustings — Jersey 2026 election",
@@ -79,23 +79,6 @@ export default async function HustingsIndexPage() {
       (SELECT COUNT(*)::int FROM hustings_events WHERE election_year = 2026 AND duration_seconds IS NOT NULL) AS events_with_duration
   `) as unknown as StatsRow[];
   const stats = statsRows[0];
-
-  const byRole = new Map<string, EventRow[]>();
-  for (const ev of events) {
-    const role = ev.role ?? "Other";
-    if (!byRole.has(role)) byRole.set(role, []);
-    byRole.get(role)!.push(ev);
-  }
-  // Sort: Connétable, Deputy, Senator, then anything else alphabetical.
-  const roleOrder = ["Connétable", "Deputy", "Senator"];
-  const sortedRoles = [...byRole.keys()].sort((a, b) => {
-    const ai = roleOrder.indexOf(a);
-    const bi = roleOrder.indexOf(b);
-    if (ai === -1 && bi === -1) return a.localeCompare(b);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -209,51 +192,7 @@ export default async function HustingsIndexPage() {
           No hustings transcripts ingested yet.
         </div>
       ) : (
-        <>
-          {sortedRoles.map((role) => (
-            <section key={role} className="mb-10">
-              <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-                {role}
-              </h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {byRole.get(role)!.map((ev) => (
-                  <Link
-                    key={ev.event_id}
-                    href={`/hustings/${ev.slug}`}
-                    className="block bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-5 hover:border-red-300 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">
-                        {ev.title}
-                      </p>
-                      <TranscriptMethodBadge method={ev.transcript_method} />
-                    </div>
-                    {ev.constituency && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                        {ev.constituency}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                      {ev.candidate_count} candidates · {ev.question_count}{" "}
-                      audience questions
-                      {ev.event_date && (
-                        <>
-                          {" "}
-                          ·{" "}
-                          {new Date(ev.event_date).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })}
-                        </>
-                      )}
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ))}
-        </>
+        <HustingsFilter events={events} />
       )}
 
       {topics.length > 0 && (

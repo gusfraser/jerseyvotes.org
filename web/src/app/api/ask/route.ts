@@ -387,6 +387,7 @@ export async function POST(req: Request) {
               const msg = await anthropic.messages.create({
                 model: ASK_MODEL,
                 max_tokens: 2048,
+                temperature: 0, // deterministic: same question → same grounded answer
                 system: [
                   {
                     type: "text",
@@ -515,6 +516,7 @@ Respond with ONLY a compact JSON object, no prose: {"on_topic": true|false, "vot
     const msg = await anthropic.messages.create({
       model: GATE_MODEL,
       max_tokens: 60,
+      temperature: 0, // deterministic gate classification
       system,
       messages: [{ role: "user", content: question }],
     });

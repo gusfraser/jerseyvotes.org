@@ -121,8 +121,14 @@ export function AskChat({
             update((a) => ({ ...a, status: String(evt.status || "") }));
           } else if (evt.type === "token") {
             update((a) => ({ ...a, text: a.text + String(evt.text || "") }));
-          } else if (evt.type === "citations") {
-            update((a) => ({ ...a, citations: (evt.items as Citation[]) || [] }));
+          } else if (evt.type === "final") {
+            // Server replaces the streamed text with a renumbered version and
+            // sends the ordered, cited-only sources.
+            update((a) => ({
+              ...a,
+              text: typeof evt.text === "string" ? (evt.text as string) : a.text,
+              citations: (evt.items as Citation[]) || a.citations || [],
+            }));
           } else if (evt.type === "error") {
             update((a) => ({
               ...a,

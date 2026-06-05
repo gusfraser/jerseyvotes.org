@@ -376,20 +376,31 @@ export async function POST(req: Request) {
             },
           );
 
-          // Show only the sources the answer actually cited ([n] markers), not
-          // the whole retrieved pool — otherwise uncited candidates show up
-          // under "Sources" as if they'd been used. Original numbers are kept
-          // so the in-text [n] markers still match the list.
-          const citedNums = new Set(
-            [...answerText.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])),
-          );
-          const shownCitations = citations.filter((c) => citedNums.has(c.n));
+          // Renumber citations in the order they're first cited, so the answer
+          // reads [1], [2], [3]… sequentially and the Sources list matches.
+          // (Retrieval order is by similarity — not a sensible display order.)
+          // Markers with no matching source (uncited pool entries or a
+          // hallucinated number) are dropped, and only cited sources are shown.
+          const order: number[] = [];
+          for (const m of answerText.matchAll(/\[(\d+)\]/g)) {
+            const n = Number(m[1]);
+            if (!order.includes(n) && citations.some((c) => c.n === n)) order.push(n);
+          }
+          const remap = new Map(order.map((old, i) => [old, i + 1]));
+          const finalAnswer = answerText.replace(/\[(\d+)\]/g, (_full, d) => {
+            const nn = remap.get(Number(d));
+            return nn ? `[${nn}]` : "";
+          });
+          const shownCitations: Citation[] = order.map((old, i) => ({
+            ...(citations.find((c) => c.n === old) as Citation),
+            n: i + 1,
+          }));
 
           await persist({
             status: "answered",
             gateOnTopic: true,
             gateReason: gate.reason,
-            answer: answerText,
+            answer: finalAnswer,
             citations: shownCitations,
             retrievalCount: hits.length,
             topScore,
@@ -398,7 +409,11 @@ export async function POST(req: Request) {
             outputTokens,
           });
 
-          controller.enqueue(ndjson({ type: "citations", items: shownCitations }));
+          // Replace the streamed (retrieval-numbered) text with the renumbered
+          // version and the ordered sources.
+          controller.enqueue(
+            ndjson({ type: "final", text: finalAnswer, items: shownCitations }),
+          );
           controller.enqueue(ndjson({ type: "done" }));
           controller.close();
         } catch (e) {

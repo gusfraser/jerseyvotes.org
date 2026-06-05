@@ -13,8 +13,11 @@ export const maxDuration = 60;
 const GATE_MODEL = process.env.ASK_GATE_MODEL || "claude-haiku-4-5-20251001";
 const ASK_MODEL = process.env.ASK_MODEL || "claude-sonnet-4-5";
 const MAX_QUESTION_CHARS = 500;
-const SITE_K = 8;
-const SCOPED_K = 24;
+// How many chunks to retrieve as the candidate pool. The answer only *shows*
+// the sources it actually cites (see below), so this is the breadth of material
+// the model can draw on, not the number of sources displayed.
+const SITE_K = Number(process.env.ASK_SITE_K || "12");
+const SCOPED_K = Number(process.env.ASK_SCOPED_K || "24");
 const MIN_SCORE = Number(process.env.ASK_MIN_SCORE || "0.3");
 
 // Rate limit: simple in-memory token bucket per IP hash. Per-instance only
@@ -373,12 +376,21 @@ export async function POST(req: Request) {
             },
           );
 
+          // Show only the sources the answer actually cited ([n] markers), not
+          // the whole retrieved pool — otherwise uncited candidates show up
+          // under "Sources" as if they'd been used. Original numbers are kept
+          // so the in-text [n] markers still match the list.
+          const citedNums = new Set(
+            [...answerText.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])),
+          );
+          const shownCitations = citations.filter((c) => citedNums.has(c.n));
+
           await persist({
             status: "answered",
             gateOnTopic: true,
             gateReason: gate.reason,
             answer: answerText,
-            citations,
+            citations: shownCitations,
             retrievalCount: hits.length,
             topScore,
             model: ASK_MODEL,
@@ -386,7 +398,7 @@ export async function POST(req: Request) {
             outputTokens,
           });
 
-          controller.enqueue(ndjson({ type: "citations", items: citations }));
+          controller.enqueue(ndjson({ type: "citations", items: shownCitations }));
           controller.enqueue(ndjson({ type: "done" }));
           controller.close();
         } catch (e) {

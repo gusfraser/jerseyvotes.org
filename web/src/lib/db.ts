@@ -155,3 +155,30 @@ export type CandidateStance = {
   source_quote: string | null;
   corrected_stance: Stance | null;
 };
+
+// Corpus stats for the /ask "searching N manifestos and ~H hours of hustings"
+// loader. Reflects what is actually searched (the rag_chunks index + hustings
+// audio). Cached in-process so we don't query Neon on every render.
+let _corpusCache: { value: { manifestos: number; hustingsHours: number }; at: number } | null = null;
+const CORPUS_TTL_MS = 5 * 60_000;
+
+export async function getCorpusStats(): Promise<{ manifestos: number; hustingsHours: number }> {
+  const now = Date.now();
+  if (_corpusCache && now - _corpusCache.at < CORPUS_TTL_MS) return _corpusCache.value;
+  try {
+    const rows = (await sql`
+      SELECT
+        (SELECT COUNT(DISTINCT candidate_id) FROM rag_chunks WHERE source_type = 'manifesto') AS manifestos,
+        (SELECT COALESCE(SUM(duration_seconds), 0) FROM hustings_events) AS hustings_seconds
+    `) as { manifestos: number; hustings_seconds: number }[];
+    const r = rows[0];
+    const value = {
+      manifestos: Number(r?.manifestos ?? 0),
+      hustingsHours: Math.round(Number(r?.hustings_seconds ?? 0) / 3600),
+    };
+    _corpusCache = { value, at: now };
+    return value;
+  } catch {
+    return _corpusCache?.value ?? { manifestos: 0, hustingsHours: 0 };
+  }
+}

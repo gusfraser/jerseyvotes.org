@@ -371,6 +371,7 @@ export default async function CandidateProfile({
             subtitle="Get answers drawn from this candidate's manifesto and hustings appearances, with sources."
             scope={{ candidateSlug: c.vote_je_slug }}
             placeholder={`Ask about ${c.full_name}…`}
+            searchingLabel={`Searching ${c.full_name}'s manifesto & hustings appearances…`}
           />
         </div>
       )}

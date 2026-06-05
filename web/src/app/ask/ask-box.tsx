@@ -12,12 +12,14 @@ export function AskBox({
   scope,
   suggestions = [],
   placeholder = "Ask a question…",
+  searchingLabel,
 }: {
   title: string;
   subtitle: string;
   scope: AskScope;
   suggestions?: string[];
   placeholder?: string;
+  searchingLabel?: string;
 }) {
   return (
     <section className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg p-5">
@@ -30,6 +32,7 @@ export function AskBox({
         suggestions={suggestions}
         variant="box"
         placeholder={placeholder}
+        searchingLabel={searchingLabel}
       />
     </section>
   );

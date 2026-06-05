@@ -17,11 +17,16 @@ export async function register() {
 
   try {
     // Default the standard OTLP env vars to Logfire when not already set, so a
-    // single LOGFIRE_TOKEN is enough. Both can still be overridden explicitly
-    // (e.g. LOGFIRE_OTLP_ENDPOINT for the EU region).
+    // single LOGFIRE_TOKEN is enough. The token encodes its region
+    // (pylf_v1_eu_… vs pylf_v1_us_…); EU tokens MUST use the EU endpoint or the
+    // data silently never arrives. LOGFIRE_OTLP_ENDPOINT overrides if needed.
+    const isEu = token.includes("_eu_");
+    const defaultEndpoint = isEu
+      ? "https://logfire-eu.pydantic.dev"
+      : "https://logfire-api.pydantic.dev";
     if (!process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
       process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
-        process.env.LOGFIRE_OTLP_ENDPOINT || "https://logfire-api.pydantic.dev";
+        process.env.LOGFIRE_OTLP_ENDPOINT || defaultEndpoint;
     }
     if (!process.env.OTEL_EXPORTER_OTLP_HEADERS) {
       process.env.OTEL_EXPORTER_OTLP_HEADERS = `Authorization=${token}`;

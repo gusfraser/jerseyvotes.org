@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     "What personal data jerseyvotes.org processes about candidates, on what legal basis, and what rights candidates have under the Data Protection (Jersey) Law 2018.",
 };
 
-const LAST_UPDATED = "21 May 2026";
+const LAST_UPDATED = "5 June 2026";
 
 export default function PrivacyPage() {
   return (
@@ -288,13 +288,25 @@ export default function PrivacyPage() {
       <Section title="Recipients and international transfers">
         <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300 list-disc pl-5 mb-4">
           <li>
-            Manifesto text is sent to{" "}
+            Manifesto text &mdash; and any question submitted to the{" "}
+            <Link href="/ask" className="text-red-700 hover:underline">
+              Ask
+            </Link>{" "}
+            feature &mdash; is sent to{" "}
             <ExternalLink href="https://www.anthropic.com">
               Anthropic
             </ExternalLink>
             &rsquo;s API in the United States for LLM processing. Anthropic
             processes the data as a processor on the site&rsquo;s behalf,
             subject to its own commitments on privacy and security.
+          </li>
+          <li>
+            Questions submitted to the Ask feature are also sent to{" "}
+            <ExternalLink href="https://www.voyageai.com">
+              Voyage AI
+            </ExternalLink>{" "}
+            (United States) to compute the search embeddings used to find
+            relevant manifesto and hustings passages.
           </li>
           <li>
             The site&rsquo;s database is hosted by{" "}
@@ -344,6 +356,47 @@ export default function PrivacyPage() {
             site&rsquo;s hosting provider (page viewed, referrer,
             IP-derived geography) is not retained beyond their standard
             operational logs.
+          </p>
+        </Prose>
+      </Section>
+
+      <Section title="The &ldquo;Ask&rdquo; feature (AI chat)">
+        <Prose>
+          <p>
+            The site offers an optional <Link href="/ask" className="text-red-700 hover:underline">Ask</Link>{" "}
+            feature: you can type a question about the 2026 election and get an
+            answer generated from candidates&rsquo; published manifestos and
+            hustings transcripts, with links back to the sources. It only
+            answers questions about the Jersey 2026 election and does not give
+            voting advice.
+          </p>
+          <p>
+            Unlike the rest of the site, this feature processes and retains some
+            visitor data so we can monitor quality, prevent abuse, and improve
+            it:
+          </p>
+        </Prose>
+        <ul className="space-y-2 mt-3 mb-4 text-sm text-gray-700 dark:text-gray-300 list-disc pl-5">
+          <li>
+            The question you type, the answer generated, and which sources were
+            used are stored in the site&rsquo;s database.
+          </li>
+          <li>
+            A one-way, salted <em>hash</em> of your IP address (never the address
+            itself) is stored for rate-limiting and abuse prevention. It is not
+            used to identify you or track you across the site.
+          </li>
+          <li>
+            Your question is sent to Anthropic and Voyage AI (United States) for
+            processing, as described under Recipients below. Please don&rsquo;t
+            enter personal or sensitive information.
+          </li>
+        </ul>
+        <Prose>
+          <p>
+            No account or login is required. Chat logs are retained for the 2026
+            election cycle for quality and abuse monitoring and then deleted or
+            aggregated. The feature can be switched off entirely at any time.
           </p>
         </Prose>
       </Section>

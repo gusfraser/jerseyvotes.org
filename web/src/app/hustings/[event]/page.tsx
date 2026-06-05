@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
 import { TranscriptMethodBadge, type TranscriptMethod } from "../transcript-method-badge";
+import { isChatEnabled } from "@/lib/flags";
+import { AskBox } from "@/app/ask/ask-box";
 
 type EventRow = {
   event_id: number;
@@ -124,6 +126,8 @@ export default async function EventPage({
   // the non-response rows to keep the page readable.
   const largePanel = candidates.length > 8;
 
+  const chatEnabled = await isChatEnabled();
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Link
@@ -233,6 +237,21 @@ export default async function EventPage({
           ))}
         </div>
       </section>
+
+      {chatEnabled && (
+        <div className="mb-6">
+          <AskBox
+            title="Ask about this hustings"
+            subtitle="Get answers drawn from what candidates said at this hustings, with sources."
+            scope={{ eventSlug: ev.slug }}
+            placeholder="Ask about this hustings…"
+            suggestions={[
+              "What was said about housing?",
+              "Where did candidates disagree?",
+            ]}
+          />
+        </div>
+      )}
 
       {/* Opening speeches */}
       {opening.length > 0 && (

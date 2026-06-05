@@ -240,15 +240,13 @@ export default async function EventPage({
 
       {chatEnabled && (
         <div className="mb-6">
+          {/* No pre-populated questions — same anti-bias rationale as candidate
+              pages. The placeholder guides without suggesting a topic. */}
           <AskBox
             title="Ask about this hustings"
             subtitle="Get answers drawn from what candidates said at this hustings, with sources."
             scope={{ eventSlug: ev.slug }}
             placeholder="Ask about this hustings…"
-            suggestions={[
-              "What was said about housing?",
-              "Where did candidates disagree?",
-            ]}
           />
         </div>
       )}

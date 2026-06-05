@@ -390,7 +390,17 @@ export async function POST(req: Request) {
     // 3 + 4. Synthesise a grounded, verbatim-quote listing, then send it.
     const stream = new ReadableStream({
       async start(controller) {
-        controller.enqueue(ndjson({ type: "meta", status: "answered", requestId }));
+        controller.enqueue(
+          ndjson({
+            type: "meta",
+            status: "answered",
+            requestId,
+            retrieved: hits.length,
+            candidates: new Set(
+              hits.map((h) => h.candidate_id).filter((id) => id != null),
+            ).size,
+          }),
+        );
         try {
           let inputTokens: number | null = null;
           let outputTokens: number | null = null;

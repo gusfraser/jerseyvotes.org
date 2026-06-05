@@ -26,6 +26,8 @@ type Msg = {
   caveat?: string;
   status?: string;
   error?: boolean;
+  retrieved?: number; // # passages retrieved (from the meta event)
+  candidates?: number; // # distinct candidates retrieved
 };
 
 export function AskChat({
@@ -33,11 +35,13 @@ export function AskChat({
   suggestions = [],
   variant = "page",
   placeholder = "Ask a question about the candidates…",
+  searchingLabel,
 }: {
   scope?: AskScope;
   suggestions?: string[];
   variant?: "page" | "box";
   placeholder?: string;
+  searchingLabel?: string;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -113,7 +117,14 @@ export function AskChat({
             continue;
           }
           if (evt.type === "meta") {
-            update((a) => ({ ...a, status: String(evt.status || "") }));
+            update((a) => ({
+              ...a,
+              status: String(evt.status || ""),
+              retrieved:
+                typeof evt.retrieved === "number" ? (evt.retrieved as number) : a.retrieved,
+              candidates:
+                typeof evt.candidates === "number" ? (evt.candidates as number) : a.candidates,
+            }));
           } else if (evt.type === "token") {
             update((a) => ({ ...a, text: a.text + String(evt.text || "") }));
           } else if (evt.type === "answer") {
@@ -165,7 +176,7 @@ export function AskChat({
             ) : (
               <div key={i} className="flex justify-start">
                 <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[92%] w-full">
-                  <AssistantMessage m={m} />
+                  <AssistantMessage m={m} searchingLabel={searchingLabel} scope={scope} />
                 </div>
               </div>
             ),
@@ -222,12 +233,20 @@ export function AskChat({
   );
 }
 
-function AssistantMessage({ m }: { m: Msg }) {
+function AssistantMessage({
+  m,
+  searchingLabel,
+  scope,
+}: {
+  m: Msg;
+  searchingLabel?: string;
+  scope?: AskScope;
+}) {
   const hasStructured = (m.items && m.items.length > 0) || !!m.intro || !!m.caveat;
 
-  // Nothing yet (waiting on the server) → thinking indicator.
+  // Nothing yet (waiting on the server) → animated, informative indicator.
   if (!hasStructured && !m.text && !m.error) {
-    return <span className="text-gray-400">Searching manifestos &amp; hustings…</span>;
+    return <SearchingIndicator m={m} searchingLabel={searchingLabel} scope={scope} />;
   }
 
   // Refusals / no-results / errors come through as plain text.
@@ -256,6 +275,53 @@ function AssistantMessage({ m }: { m: Msg }) {
 
 // Verbatim quotes grouped by candidate, each linked to its original source
 // (the YouTube moment for hustings, the manifesto URL otherwise).
+// Animated loading state. Before the server's `meta` event it shows the
+// scope-aware "Searching N manifestos…" label; once passages are retrieved it
+// switches to the real "Reading N passages from M candidates…" count, with a
+// pulsing dot + skeleton shimmer so the ~15-25s synthesis wait feels alive.
+function SearchingIndicator({
+  m,
+  searchingLabel,
+  scope,
+}: {
+  m: Msg;
+  searchingLabel?: string;
+  scope?: AskScope;
+}) {
+  let label: string;
+  if (typeof m.retrieved === "number") {
+    const n = m.retrieved;
+    const p = n === 1 ? "passage" : "passages";
+    if (scope?.candidateSlug) {
+      label = `Reading ${n} of their ${n === 1 ? "statement" : "statements"}…`;
+    } else if (scope?.eventSlug) {
+      label = `Reading ${n} ${p} from this hustings…`;
+    } else {
+      const c = m.candidates ?? 0;
+      label = `Reading ${n} ${p} from ${c} ${c === 1 ? "candidate" : "candidates"}…`;
+    }
+  } else {
+    label = searchingLabel || "Searching the manifestos & hustings…";
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+        <span className="relative flex h-2.5 w-2.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-600" />
+        </span>
+        <span className="text-sm">{label}</span>
+      </div>
+      <div className="space-y-1.5 pt-0.5" aria-hidden="true">
+        <div className="h-3 w-2/5 rounded bg-gray-200 dark:bg-zinc-800 animate-pulse" />
+        <div className="h-3 w-11/12 rounded bg-gray-200 dark:bg-zinc-800 animate-pulse" />
+        <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-zinc-800 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 function AnswerItems({ items }: { items: AnswerItem[] }) {
   type Group = {
     candidate: string | null;

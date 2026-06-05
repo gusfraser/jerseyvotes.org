@@ -247,6 +247,7 @@ export default async function EventPage({
             subtitle="Get answers drawn from what candidates said at this hustings, with sources."
             scope={{ eventSlug: ev.slug }}
             placeholder="Ask about this hustings…"
+            searchingLabel="Searching this hustings transcript…"
           />
         </div>
       )}

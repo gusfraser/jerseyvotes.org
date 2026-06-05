@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { isChatEnabled } from "@/lib/flags";
+import { getCorpusStats } from "@/lib/db";
 import { AskChat } from "./ask-chat";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ const SUGGESTIONS = [
 
 export default async function AskPage() {
   const enabled = await isChatEnabled();
+  const stats = enabled ? await getCorpusStats() : null;
+  const searchingLabel =
+    stats && stats.manifestos > 0
+      ? `Searching ${stats.manifestos} manifestos and ~${stats.hustingsHours} hours of hustings…`
+      : undefined;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -35,7 +41,7 @@ export default async function AskPage() {
       </header>
 
       {enabled ? (
-        <AskChat suggestions={SUGGESTIONS} variant="page" />
+        <AskChat suggestions={SUGGESTIONS} variant="page" searchingLabel={searchingLabel} />
       ) : (
         <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-6 text-gray-600 dark:text-gray-400">
           <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">

@@ -363,15 +363,14 @@ export default async function CandidateProfile({
 
       {chatEnabled && (
         <div className="mb-6">
+          {/* No pre-populated questions here: suggesting a specific topic on a
+              candidate's own page could read as editorial bias. The placeholder
+              guides without steering. */}
           <AskBox
             title={`Ask about ${c.full_name}`}
             subtitle="Get answers drawn from this candidate's manifesto and hustings appearances, with sources."
             scope={{ candidateSlug: c.vote_je_slug }}
             placeholder={`Ask about ${c.full_name}…`}
-            suggestions={[
-              "What are their main priorities?",
-              "What do they say about housing?",
-            ]}
           />
         </div>
       )}

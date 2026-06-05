@@ -20,7 +20,7 @@ export async function generateMetadata({
   const name = member.display_name as string;
   return {
     title: name,
-    description: `${name} — ${position} of the Jersey States Assembly. View their full voting record, participation rate, and topic breakdown.`,
+    description: `${name} — ${position} of the Jersey States Assembly. View their full voting record, attendance, and topic breakdown.`,
     openGraph: { title: name, url: `https://jerseyvotes.org/members/${slug}` },
   };
 }
@@ -42,7 +42,7 @@ export default async function MemberPage({
 
   const memberId = member.member_id as number;
 
-  const [voteStats, recentVotes, topicBreakdown] = await Promise.all([
+  const [voteStats, sessionStats, recentVotes, topicBreakdown] = await Promise.all([
     sql`SELECT
           COUNT(*) as total_divisions,
           COUNT(CASE WHEN vote_category = 'active_vote' THEN 1 END) as active_votes,
@@ -52,6 +52,25 @@ export default async function MemberPage({
           COUNT(CASE WHEN vote_category = 'unexcused_absence' THEN 1 END) as unexcused,
           COUNT(CASE WHEN vote_category = 'excused_absence' THEN 1 END) as excused
         FROM votes WHERE member_id = ${memberId}`,
+    // Session-level (per sitting day): a sitting often holds many separate
+    // divisions, so counting missed *votes* overstates absence. We group
+    // votes by date and treat a member as present for a sitting if they cast
+    // at least one active vote (Pour/Contre/Abstain) that day.
+    sql`WITH member_days AS (
+          SELECT vd.date::date AS d,
+                 COUNT(*) FILTER (WHERE v.vote_category = 'active_vote')       AS active,
+                 COUNT(*) FILTER (WHERE v.vote_category = 'unexcused_absence') AS unexcused
+          FROM votes v
+          JOIN vote_divisions vd ON v.division_id = vd.division_id
+          WHERE v.member_id = ${memberId}
+          GROUP BY vd.date::date
+        )
+        SELECT
+          COUNT(*)::int                                                    AS sitting_days,
+          COUNT(*) FILTER (WHERE active > 0)::int                          AS sessions_attended,
+          COUNT(*) FILTER (WHERE active = 0 AND unexcused > 0)::int        AS sessions_missed_unexcused,
+          COUNT(*) FILTER (WHERE active = 0 AND unexcused = 0)::int        AS sessions_missed_excused
+        FROM member_days`,
     sql`SELECT v.vote, vd.proposition_title, vd.date, vd.division_id,
              vd.reference, vd.pour_count, vd.contre_count, vd.division_stage,
              p.topic_primary
@@ -82,11 +101,24 @@ export default async function MemberPage({
   }[];
   const mainPosition = positions?.[0]?.position ?? "Member";
 
-  const participation =
+  // Vote-level participation: share of all divisions where they cast a vote.
+  // Kept for context, but no longer the headline number — see below.
+  const voteParticipation =
     (stats.total_divisions as number) > 0
       ? ((stats.active_votes as number) / (stats.total_divisions as number)) *
         100
       : 0;
+
+  // Session-level (the fairer headline): attendance counts sitting days, not
+  // individual votes, so a member who missed one busy day isn't penalised once
+  // per division.
+  const sess = sessionStats[0];
+  const sittingDays = sess.sitting_days as number;
+  const sessionsAttended = sess.sessions_attended as number;
+  const sessionsMissedUnexcused = sess.sessions_missed_unexcused as number;
+  const sessionsMissedExcused = sess.sessions_missed_excused as number;
+  const attendance =
+    sittingDays > 0 ? (sessionsAttended / sittingDays) * 100 : 0;
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -124,10 +156,11 @@ export default async function MemberPage({
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
         <StatBox
-          label="Participation"
-          value={`${participation.toFixed(1)}%`}
+          label="Attendance"
+          value={`${attendance.toFixed(1)}%`}
+          sub={`${sessionsAttended.toLocaleString()} of ${sittingDays.toLocaleString()} sittings`}
         />
         <StatBox
           label="Pour"
@@ -145,11 +178,28 @@ export default async function MemberPage({
           color="text-yellow-600"
         />
         <StatBox
-          label="Absences"
-          value={String(stats.unexcused)}
+          label="Sessions missed"
+          value={sessionsMissedUnexcused.toLocaleString()}
           color="text-gray-500"
+          sub={
+            sessionsMissedExcused > 0
+              ? `unexcused · ${sessionsMissedExcused.toLocaleString()} excused`
+              : "unexcused"
+          }
         />
       </div>
+
+      <p className="text-xs text-gray-400 mb-8 max-w-3xl">
+        Attendance and sessions missed are counted by <strong>sitting day</strong>:
+        a member counts as present for a sitting if they cast at least one vote
+        (Pour, Contre or Abstain) that day. Grouping by day avoids over-stating
+        absence on days that held many separate votes. Excused absences (illness,
+        official duty) are reported separately. Across all{" "}
+        {Number(stats.total_divisions).toLocaleString()} divisions in their term,{" "}
+        {member.display_name as string} cast{" "}
+        {Number(stats.active_votes).toLocaleString()} votes (
+        {voteParticipation.toFixed(1)}% of divisions).
+      </p>
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Recent votes */}
@@ -241,15 +291,18 @@ function StatBox({
   label,
   value,
   color = "text-gray-900",
+  sub,
 }: {
   label: string;
   value: string;
   color?: string;
+  sub?: string;
 }) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4 text-center">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       <p className="text-xs text-gray-500 mt-1">{label}</p>
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }

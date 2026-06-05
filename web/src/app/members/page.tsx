@@ -10,18 +10,35 @@ export const metadata: Metadata = {
 };
 
 export default async function MembersPage() {
+  // Attendance is computed per sitting day (not per division): a sitting often
+  // holds many separate votes, so counting missed votes would overstate
+  // absence. A member counts as present for a day if they cast >= 1 active vote.
   const members = await sql`
+    WITH member_days AS (
+      SELECT v.member_id, vd.date::date AS d,
+             MAX((v.vote_category = 'active_vote')::int) AS attended
+      FROM votes v
+      JOIN vote_divisions vd ON v.division_id = vd.division_id
+      GROUP BY v.member_id, vd.date::date
+    ),
+    sessions AS (
+      SELECT member_id,
+             COUNT(*) AS sitting_days,
+             SUM(attended) AS sessions_attended
+      FROM member_days
+      GROUP BY member_id
+    )
     SELECT m.member_id, m.canonical_name, m.display_name,
            m.is_currently_active, m.position_history,
            m.first_vote_date::date as first_date,
            m.last_vote_date::date as last_date,
            COUNT(CASE WHEN v.vote_category = 'active_vote' THEN 1 END) as active_votes,
-           COUNT(*) as total_divisions,
-           COUNT(CASE WHEN v.vote = 'Pour' THEN 1 END) as pour_count,
-           COUNT(CASE WHEN v.vote = 'Contre' THEN 1 END) as contre_count
+           COALESCE(s.sitting_days, 0) as sitting_days,
+           COALESCE(s.sessions_attended, 0) as sessions_attended
     FROM members m
     LEFT JOIN votes v ON m.member_id = v.member_id
-    GROUP BY m.member_id
+    LEFT JOIN sessions s ON s.member_id = m.member_id
+    GROUP BY m.member_id, s.sitting_days, s.sessions_attended
     ORDER BY m.is_currently_active DESC, m.canonical_name
   `;
 
@@ -59,9 +76,9 @@ export default async function MembersPage() {
 function MemberCard({ member: m }: { member: Record<string, unknown> }) {
   const positions = m.position_history as { position: string; count: number }[];
   const mainPosition = positions?.[0]?.position ?? "Member";
-  const participation =
-    (m.total_divisions as number) > 0
-      ? ((m.active_votes as number) / (m.total_divisions as number)) * 100
+  const attendance =
+    (m.sitting_days as number) > 0
+      ? ((m.sessions_attended as number) / (m.sitting_days as number)) * 100
       : 0;
 
   return (
@@ -91,9 +108,9 @@ function MemberCard({ member: m }: { member: Record<string, unknown> }) {
         </div>
         <div>
           <p className="font-semibold text-gray-900">
-            {participation.toFixed(0)}%
+            {attendance.toFixed(0)}%
           </p>
-          <p className="text-gray-400">Participation</p>
+          <p className="text-gray-400">Attendance</p>
         </div>
         <div>
           <p className="font-semibold text-gray-900">

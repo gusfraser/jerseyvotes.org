@@ -1,0 +1,15 @@
+event_slug: st-lawrence-connetable-2026
+title: Connétable of St Lawrence Hustings 2026
+role: Connétable
+constituency: St Lawrence
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=e9bd43DSQ98
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-lawrence-connetable-2026/transcript.md
+candidates:
+- name: John Le Fondré
+  vote_je_slug: john-le-fondre-4
+- name: Tina Palmer
+  vote_je_slug: tina-palmer
+moderator_names: []
+speaker_overrides: {}

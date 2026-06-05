@@ -1,0 +1,23 @@
+event_slug: st-ouen-meeting-st-mary-st-ouen-and-st-peter-deputy-2026
+title: Deputy of St Mary, St Ouen and St Peter Hustings 2026 (St Ouen meeting)
+role: Deputy
+constituency: St Mary, St Ouen and St Peter
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=i9dr2MZxtlc
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-ouen-meeting-st-mary-st-ouen-and-st-peter-deputy-2026/transcript.md
+candidates:
+- name: Arlene Maltman
+  vote_je_slug: arlene-maltman
+- name: Chris Rebindaine
+  vote_je_slug: chris-rebindaine
+- name: David Benn
+  vote_je_slug: david-benn-2
+- name: Helen Evans
+  vote_je_slug: helen-evans-2
+- name: Lucy Stephenson
+  vote_je_slug: lucy-stephenson-2
+- name: Russell Labey
+  vote_je_slug: russell-labey-3
+moderator_names: []
+speaker_overrides: {}

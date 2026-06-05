@@ -3,32 +3,27 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-// Shared streaming chat client used by both the site-wide /ask page and the
-// scoped "Ask about this candidate / hustings" box. Talks to /api/ask, which
-// streams newline-delimited JSON events: meta → token* → citations? → done.
+// Shared chat client used by both the site-wide /ask page and the scoped
+// "Ask about this candidate / hustings" box. Talks to /api/ask, which streams
+// newline-delimited JSON events: meta → (token* for refusals | answer) → done.
 
-export type Citation = {
-  n: number;
-  source_type: string;
-  candidate_name: string | null;
-  candidate_slug: string | null;
-  role: string | null;
-  constituency: string | null;
-  source_url: string;
-  source_label: string | null;
-  event_slug: string | null;
-  youtube_url: string | null;
-  timestamp_seconds: number | null;
-  segment_type: string | null;
-  score: number;
+export type AnswerItem = {
+  candidate: string | null;
+  candidateSlug: string | null;
+  sourceType: string; // 'manifesto' | 'hustings'
+  quote: string; // verbatim, verified server-side
+  gist: string; // optional neutral context
+  url: string; // link to the original source
 };
 
 export type AskScope = { candidateSlug?: string; eventSlug?: string };
 
 type Msg = {
   role: "user" | "assistant";
-  text: string;
-  citations?: Citation[];
+  text: string; // refusals / no-results / errors
+  intro?: string; // structured answer framing
+  items?: AnswerItem[]; // verbatim quote listing
+  caveat?: string;
   status?: string;
   error?: boolean;
 };
@@ -121,13 +116,13 @@ export function AskChat({
             update((a) => ({ ...a, status: String(evt.status || "") }));
           } else if (evt.type === "token") {
             update((a) => ({ ...a, text: a.text + String(evt.text || "") }));
-          } else if (evt.type === "final") {
-            // Server replaces the streamed text with a renumbered version and
-            // sends the ordered, cited-only sources.
+          } else if (evt.type === "answer") {
+            // The grounded, verbatim-quote listing (sent once synthesis is done).
             update((a) => ({
               ...a,
-              text: typeof evt.text === "string" ? (evt.text as string) : a.text,
-              citations: (evt.items as Citation[]) || a.citations || [],
+              intro: typeof evt.intro === "string" ? (evt.intro as string) : "",
+              items: (evt.items as AnswerItem[]) || [],
+              caveat: typeof evt.caveat === "string" ? (evt.caveat as string) : "",
             }));
           } else if (evt.type === "error") {
             update((a) => ({
@@ -170,17 +165,7 @@ export function AskChat({
             ) : (
               <div key={i} className="flex justify-start">
                 <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-2xl rounded-bl-sm px-4 py-3 text-sm max-w-[92%] w-full">
-                  {m.status === "loading" && !m.text ? (
-                    <span className="text-gray-400">Thinking…</span>
-                  ) : (
-                    <RichText
-                      text={m.text}
-                      className={m.error ? "text-red-700 dark:text-red-400" : ""}
-                    />
-                  )}
-                  {m.citations && m.citations.length > 0 && (
-                    <Citations items={m.citations} />
-                  )}
+                  <AssistantMessage m={m} />
                 </div>
               </div>
             ),
@@ -237,48 +222,125 @@ export function AskChat({
   );
 }
 
-function Citations({ items }: { items: Citation[] }) {
+function AssistantMessage({ m }: { m: Msg }) {
+  const hasStructured = (m.items && m.items.length > 0) || !!m.intro || !!m.caveat;
+
+  // Nothing yet (waiting on the server) → thinking indicator.
+  if (!hasStructured && !m.text && !m.error) {
+    return <span className="text-gray-400">Searching manifestos &amp; hustings…</span>;
+  }
+
+  // Refusals / no-results / errors come through as plain text.
+  if (!hasStructured) {
+    return (
+      <RichText text={m.text} className={m.error ? "text-red-700 dark:text-red-400" : ""} />
+    );
+  }
+
   return (
-    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-zinc-800">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-        Sources
-      </p>
-      <ol className="space-y-1">
-        {items.map((c) => {
-          const onSite =
-            c.source_type === "hustings" && c.event_slug
-              ? `/hustings/${c.event_slug}`
-              : c.candidate_slug
-                ? `/candidates/${c.candidate_slug}`
-                : null;
-          const kind = c.source_type === "hustings" ? "hustings" : "manifesto";
-          return (
-            <li key={c.n} className="text-xs text-gray-600 dark:text-gray-400 flex gap-1.5">
-              <span className="text-gray-400 shrink-0">[{c.n}]</span>
-              <span className="flex-1">
-                {onSite ? (
-                  <Link href={onSite} className="text-red-700 dark:text-red-400 hover:underline font-medium">
-                    {c.candidate_name || "Source"}
-                  </Link>
-                ) : (
-                  <span className="font-medium">{c.candidate_name || "Source"}</span>
-                )}{" "}
-                <span className="text-gray-400">· {kind}</span>{" "}
-                <a
-                  href={c.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-red-700"
-                  title="Open original source"
-                >
-                  ↗
-                </a>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+    <div>
+      {m.intro && <RichText text={m.intro} />}
+      {m.items && m.items.length > 0 && (
+        <div className={m.intro ? "mt-3" : ""}>
+          <AnswerItems items={m.items} />
+        </div>
+      )}
+      {m.caveat && (
+        <p className="mt-3 pt-2 border-t border-gray-200 dark:border-zinc-800 text-xs text-gray-500 dark:text-gray-400 italic">
+          {m.caveat}
+        </p>
+      )}
     </div>
+  );
+}
+
+// Verbatim quotes grouped by candidate, each linked to its original source
+// (the YouTube moment for hustings, the manifesto URL otherwise).
+function AnswerItems({ items }: { items: AnswerItem[] }) {
+  type Group = {
+    candidate: string | null;
+    candidateSlug: string | null;
+    sourceType: string;
+    items: AnswerItem[];
+  };
+  // Group all of a candidate's quotes together (by candidate + medium),
+  // preserving the order each candidate first appears.
+  const groups: Group[] = [];
+  const byKey = new Map<string, Group>();
+  for (const it of items) {
+    const key = `${it.candidateSlug ?? it.candidate ?? ""}|${it.sourceType}`;
+    let g = byKey.get(key);
+    if (!g) {
+      g = {
+        candidate: it.candidate,
+        candidateSlug: it.candidateSlug,
+        sourceType: it.sourceType,
+        items: [],
+      };
+      byKey.set(key, g);
+      groups.push(g);
+    }
+    g.items.push(it);
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((g, gi) => (
+        <div key={gi}>
+          <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
+            {g.candidateSlug ? (
+              <Link
+                href={`/candidates/${g.candidateSlug}`}
+                className="font-semibold text-gray-900 dark:text-gray-100 hover:text-red-700"
+              >
+                {g.candidate || "Candidate"}
+              </Link>
+            ) : (
+              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                {g.candidate || "Candidate"}
+              </span>
+            )}
+            <span className="text-xs text-gray-400">
+              · {g.sourceType === "hustings" ? "at hustings" : "manifesto"}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {g.items.map((it, ii) => (
+              <div key={ii}>
+                {it.quote ? (
+                  <blockquote className="border-l-2 border-gray-200 dark:border-zinc-700 pl-3 text-sm text-gray-800 dark:text-gray-200">
+                    <span className="italic">&ldquo;{it.quote}&rdquo;</span>{" "}
+                    <SourceLink url={it.url} />
+                  </blockquote>
+                ) : (
+                  <p className="text-sm text-gray-700 dark:text-gray-300 pl-3">
+                    {it.gist} <SourceLink url={it.url} />
+                  </p>
+                )}
+                {it.quote && it.gist && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 pl-3 mt-0.5">
+                    {it.gist}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SourceLink({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs text-red-700 dark:text-red-400 hover:underline whitespace-nowrap"
+    >
+      source&nbsp;↗
+    </a>
   );
 }
 

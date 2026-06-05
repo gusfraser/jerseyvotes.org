@@ -3,6 +3,12 @@ import Link from "next/link";
 import { sql, TOPICS } from "@/lib/db";
 import { HustingsFilter } from "./filter";
 
+// Render on every request so the "Coverage so far" panel reflects the live
+// DB as new hustings are ingested. Without this the page is statically
+// rendered at build time and its counts freeze (e.g. showing 31 sessions
+// while the homepage — which is force-dynamic — already shows 36+).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Hustings — Jersey 2026 election",
   description:

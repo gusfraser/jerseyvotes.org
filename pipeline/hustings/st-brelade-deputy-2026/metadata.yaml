@@ -1,0 +1,19 @@
+event_slug: st-brelade-deputy-2026
+title: Deputy of St Brelade Hustings 2026
+role: Deputy
+constituency: St Brelade
+election_year: 2026
+event_date: null
+youtube_url: https://www.youtube.com/watch?v=e_4k6kF2KkA
+transcript_source_url: https://github.com/gusfraser/jerseyvotes.org/blob/main/pipeline/hustings/st-brelade-deputy-2026/transcript.md
+candidates:
+- name: Gabriel Raimondo
+  vote_je_slug: gabriel-raimondo
+- name: John Young
+  vote_je_slug: john-young-4
+- name: Jonathan Renouf
+  vote_je_slug: jonathan-renouf-2
+- name: Monty Tadier
+  vote_je_slug: monty-tadier-3
+moderator_names: []
+speaker_overrides: {}

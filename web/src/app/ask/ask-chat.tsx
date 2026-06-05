@@ -8,8 +8,9 @@ import Link from "next/link";
 // newline-delimited JSON events: meta → (token* for refusals | answer) → done.
 
 export type AnswerItem = {
-  candidate: string | null;
-  candidateSlug: string | null;
+  candidate: string | null; // candidate name, or party name for a shared manifesto
+  candidateSlug: string | null; // null for a party-grouped item
+  memberCount?: number | null; // # candidates sharing a party manifesto
   sourceType: string; // 'manifesto' | 'hustings'
   quote: string; // verbatim, verified server-side
   gist: string; // optional neutral context
@@ -225,6 +226,13 @@ export function AskChat({
         </button>
       </form>
 
+      {variant === "page" && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Tip: ask about one topic at a time — and one candidate, or all — for the
+          sharpest answers.
+        </p>
+      )}
+
       <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
         AI-generated from candidates&rsquo; published manifestos and hustings
         transcripts. Always verify against the linked sources. Not voting advice.
@@ -327,6 +335,7 @@ function AnswerItems({ items }: { items: AnswerItem[] }) {
     candidate: string | null;
     candidateSlug: string | null;
     sourceType: string;
+    memberCount?: number | null;
     items: AnswerItem[];
   };
   // Group all of a candidate's quotes together (by candidate + medium),
@@ -341,6 +350,7 @@ function AnswerItems({ items }: { items: AnswerItem[] }) {
         candidate: it.candidate,
         candidateSlug: it.candidateSlug,
         sourceType: it.sourceType,
+        memberCount: it.memberCount ?? null,
         items: [],
       };
       byKey.set(key, g);
@@ -368,6 +378,7 @@ function AnswerItems({ items }: { items: AnswerItem[] }) {
             )}
             <span className="text-xs text-gray-400">
               · {g.sourceType === "hustings" ? "at hustings" : "manifesto"}
+              {g.memberCount && g.memberCount > 1 ? ` · ${g.memberCount} candidates` : ""}
             </span>
           </div>
           <div className="space-y-2">

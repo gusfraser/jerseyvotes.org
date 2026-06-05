@@ -5,6 +5,8 @@ import { sql } from "@/lib/db";
 import { slugify } from "@/lib/slugify";
 import { TrackView } from "@/lib/track-view";
 import { TranscriptMethodBadge } from "@/app/hustings/transcript-method-badge";
+import { isChatEnabled } from "@/lib/flags";
+import { AskBox } from "@/app/ask/ask-box";
 
 type CandidateFull = {
   candidate_id: number;
@@ -239,6 +241,8 @@ export default async function CandidateProfile({
     !!c.enhanced_manifesto_source_label &&
     MANUAL_SOURCE_LABELS.has(c.enhanced_manifesto_source_label);
 
+  const chatEnabled = await isChatEnabled();
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <TrackView
@@ -356,6 +360,21 @@ export default async function CandidateProfile({
           </div>
         </div>
       </header>
+
+      {chatEnabled && (
+        <div className="mb-6">
+          <AskBox
+            title={`Ask about ${c.full_name}`}
+            subtitle="Get answers drawn from this candidate's manifesto and hustings appearances, with sources."
+            scope={{ candidateSlug: c.vote_je_slug }}
+            placeholder={`Ask about ${c.full_name}…`}
+            suggestions={[
+              "What are their main priorities?",
+              "What do they say about housing?",
+            ]}
+          />
+        </div>
+      )}
 
       {/* Topic coverage */}
       {topics.length > 0 && (

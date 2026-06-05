@@ -11,7 +11,7 @@ type NavItem =
 // Top-level nav. Election-cycle items (Candidates / Quiz / Hustings) are
 // flat so voters see them straight away. Assembly voting-record analysis
 // is collapsed under one dropdown to keep the top bar from cramping.
-const navLinks: NavItem[] = [
+const BASE_NAV: NavItem[] = [
   { kind: "link", href: "/candidates", label: "Candidates", highlight: true },
   { kind: "link", href: "/candidates/quiz", label: "Voting Quiz" },
   { kind: "link", href: "/hustings", label: "Hustings" },
@@ -29,6 +29,18 @@ const navLinks: NavItem[] = [
   { kind: "link", href: "/about", label: "About" },
 ];
 
+// The "Ask" link only appears when the chat feature flag is on. `chatEnabled`
+// is resolved server-side in layout.tsx and passed down (this is a client
+// component, so it can't read the flag itself).
+function buildNav(chatEnabled: boolean): NavItem[] {
+  if (!chatEnabled) return BASE_NAV;
+  return [
+    ...BASE_NAV.slice(0, 3),
+    { kind: "link", href: "/ask", label: "Ask" },
+    ...BASE_NAV.slice(3),
+  ];
+}
+
 // Flatten to all hrefs so activeHref can scan them.
 function allLinks(items: NavItem[]): { href: string; label: string }[] {
   const out: { href: string; label: string }[] = [];
@@ -40,9 +52,9 @@ function allLinks(items: NavItem[]): { href: string; label: string }[] {
 }
 
 // Pick the single most-specific link to highlight for a given pathname.
-function activeHref(pathname: string): string | null {
+function activeHref(pathname: string, items: NavItem[]): string | null {
   let best: string | null = null;
-  for (const { href } of allLinks(navLinks)) {
+  for (const { href } of allLinks(items)) {
     if (pathname === href || pathname.startsWith(href + "/")) {
       if (best === null || href.length > best.length) best = href;
     }
@@ -71,11 +83,12 @@ function useTheme() {
   return { theme, toggle };
 }
 
-export function Nav() {
+export function Nav({ chatEnabled = false }: { chatEnabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { theme, toggle } = useTheme();
-  const activeLink = activeHref(pathname);
+  const navLinks = buildNav(chatEnabled);
+  const activeLink = activeHref(pathname, navLinks);
 
   return (
     <header className="bg-white dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800 sticky top-0 z-50">

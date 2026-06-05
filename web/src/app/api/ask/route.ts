@@ -230,7 +230,20 @@ export async function POST(req: Request) {
     const gate = await span(
       "ask.gate",
       { "req_id": requestId, "ask.scope": scope.type },
-      async () => runGate(anthropic, question, scope),
+      async (s) => {
+        const g = await runGate(anthropic, question, scope);
+        // GenAI semantic conventions so Logfire treats this as an LLM call.
+        setAttrs(s, {
+          "gen_ai.system": "anthropic",
+          "gen_ai.operation.name": "chat",
+          "gen_ai.request.model": GATE_MODEL,
+          "gen_ai.request.temperature": 0,
+          "gen_ai.usage.input_tokens": g.inputTokens,
+          "gen_ai.usage.output_tokens": g.outputTokens,
+          "gate.on_topic": g.onTopic,
+        });
+        return g;
+      },
     );
 
     if (!gate.onTopic) {
@@ -415,8 +428,16 @@ export async function POST(req: Request) {
                 .join("");
               grounded = groundAnswer(raw, hits, citations);
               setAttrs(s, {
-                "synthesis.input_tokens": inputTokens,
-                "synthesis.output_tokens": outputTokens,
+                // OpenTelemetry GenAI semantic conventions → Logfire renders
+                // this as an LLM call with model, token usage and cost.
+                "gen_ai.system": "anthropic",
+                "gen_ai.operation.name": "chat",
+                "gen_ai.request.model": ASK_MODEL,
+                "gen_ai.request.temperature": 0,
+                "gen_ai.request.max_tokens": 4096,
+                "gen_ai.response.model": msg.model,
+                "gen_ai.usage.input_tokens": inputTokens,
+                "gen_ai.usage.output_tokens": outputTokens,
                 "answer.items": grounded.items.length,
               });
             },
@@ -498,7 +519,14 @@ async function runGate(
   anthropic: Anthropic,
   question: string,
   scope: Scope,
-): Promise<{ onTopic: boolean; votingAdvice: boolean; search: string; reason: string }> {
+): Promise<{
+  onTopic: boolean;
+  votingAdvice: boolean;
+  search: string;
+  reason: string;
+  inputTokens: number | null;
+  outputTokens: number | null;
+}> {
   const scopeNote =
     scope.type === "candidate"
       ? "\n\nIMPORTANT CONTEXT: the user is on a specific Jersey 2026 election candidate's profile page. A question that uses pronouns (\"her\", \"his\", \"their\", \"this candidate\") or omits the subject refers to that candidate and is ON-TOPIC."
@@ -544,6 +572,8 @@ Respond with ONLY a compact JSON object, no prose: {"on_topic": true|false, "vot
       votingAdvice: parsed.voting_advice === true,
       search: String(parsed.search ?? "").slice(0, 200),
       reason: (parsed.reason || "").slice(0, 200),
+      inputTokens: msg.usage.input_tokens,
+      outputTokens: msg.usage.output_tokens,
     };
   } catch (e) {
     // Fail closed: if we can't classify, refuse rather than risk answering
@@ -553,6 +583,8 @@ Respond with ONLY a compact JSON object, no prose: {"on_topic": true|false, "vot
       votingAdvice: false,
       search: "",
       reason: `gate_error: ${(e as Error).message}`.slice(0, 200),
+      inputTokens: null,
+      outputTokens: null,
     };
   }
 }

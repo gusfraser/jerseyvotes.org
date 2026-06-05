@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { sql, daysUntilElection } from "@/lib/db";
+import { isChatEnabled } from "@/lib/flags";
 import { TrackedLink } from "@/lib/track-click";
 
 // Render on every request so the "X days until you vote" hero is always
@@ -26,6 +27,7 @@ const JERSEY_CONSTITUENCIES = [
 
 export default async function Home() {
   const days = daysUntilElection();
+  const chatEnabled = await isChatEnabled();
 
   const [statsResult, candidateStats, recentVotes, hustingsStatsRows] = await Promise.all([
     sql`SELECT
@@ -118,6 +120,16 @@ export default async function Home() {
                 ? `Browse all ${totalCandidates} candidates`
                 : "Browse candidates"}
             </TrackedLink>
+            {chatEnabled && (
+              <TrackedLink
+                href="/ask"
+                event="home_cta_clicked"
+                params={{ cta: "ask" }}
+                className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+              >
+                Ask a question &rarr;
+              </TrackedLink>
+            )}
           </div>
           <p className="mt-4 text-sm text-red-200">
             <TrackedLink

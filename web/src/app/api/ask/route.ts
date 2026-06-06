@@ -24,10 +24,13 @@ const PER_CANDIDATE = Number(process.env.ASK_PER_CANDIDATE || "2"); // breadth c
 const SCOPED_K = Number(process.env.ASK_SCOPED_K || "24"); // single candidate/event: keep depth
 const MIN_SCORE = Number(process.env.ASK_MIN_SCORE || "0.3");
 
-// Rate limit: simple in-memory token bucket per IP hash. Per-instance only
-// (fine for v1); the DB log + flag are the real backstops.
-const RATE_MAX = Number(process.env.ASK_RATE_MAX || "20");
-const RATE_WINDOW_MS = Number(process.env.ASK_RATE_WINDOW_MS || "300000"); // 5 min
+// Rate limit: 10 questions per IP per hour, to stop automated / scripted use.
+// Two layers — a fast in-memory token bucket (per-instance) and a DB-backed
+// count over chat_logs (cross-instance, survives restarts) — so the cap can't
+// be bypassed by multiple instances or a redeploy. ip_hash rotates hourly for
+// privacy, so the DB check is effectively a per-(rotation-)hour cap.
+const RATE_MAX = Number(process.env.ASK_RATE_MAX || "10"); // max questions per IP per hour
+const RATE_WINDOW_MS = Number(process.env.ASK_RATE_WINDOW_MS || "3600000"); // 1 hour
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 const REFUSAL_OFF_TOPIC =
@@ -159,6 +162,10 @@ function redactContactDetails(text: string): string {
 
 function rateLimited(ipHash: string): boolean {
   const now = Date.now();
+  // Opportunistic cleanup so the map can't grow unbounded under IP churn/abuse.
+  if (rateBuckets.size > 5000) {
+    for (const [k, v] of rateBuckets) if (now > v.resetAt) rateBuckets.delete(k);
+  }
   const b = rateBuckets.get(ipHash);
   if (!b || now > b.resetAt) {
     rateBuckets.set(ipHash, { count: 1, resetAt: now + RATE_WINDOW_MS });
@@ -166,6 +173,21 @@ function rateLimited(ipHash: string): boolean {
   }
   b.count += 1;
   return b.count > RATE_MAX;
+}
+
+// Cross-instance backstop: count this IP-hash's logged requests in the past hour.
+// Survives restarts and is shared across instances, unlike the in-memory bucket.
+async function dbRateExceeded(ipHash: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      SELECT count(*)::int AS n FROM chat_logs
+      WHERE ip_hash = ${ipHash} AND created_at > now() - interval '1 hour'
+    `) as { n: number }[];
+    return (rows[0]?.n ?? 0) >= RATE_MAX;
+  } catch {
+    // On a DB hiccup, fall back to the in-memory limiter rather than blocking.
+    return false;
+  }
 }
 
 type Scope = { type: "site" | "candidate" | "hustings"; ref: string | null };
@@ -242,9 +264,13 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (rateLimited(ipHash)) {
+  // In-memory first (cheap, blocks same-instance floods without a DB hit), then
+  // the DB-backed cross-instance count. Short-circuits if the first trips.
+  if (rateLimited(ipHash) || (await dbRateExceeded(ipHash))) {
     return Response.json(
-      { error: "Too many questions in a short time. Please wait a minute and try again." },
+      {
+        error: `You've reached the limit of ${RATE_MAX} questions per hour. Please try again later.`,
+      },
       { status: 429 },
     );
   }

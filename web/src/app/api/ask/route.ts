@@ -117,6 +117,24 @@ function hashIp(ip: string): string {
   return createHash("sha256").update(salt + ip).digest("hex").slice(0, 32);
 }
 
+// Strip high-confidence personal contact details before we PERSIST text to
+// chat_logs. This governs only what we RETAIN — the live request is still sent
+// to the model to be answered. Names are deliberately NOT redacted: candidate
+// names are public and essential, and reliable name detection isn't feasible
+// here (the on-screen notice is the primary control for personal names).
+function redactContactDetails(text: string): string {
+  return text
+    // Email addresses.
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[redacted email]")
+    // UK / Jersey (JE) / Guernsey (GY) style postcodes, e.g. "JE2 3AB".
+    .replace(/\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/gi, "[redacted postcode]")
+    // Phone-like runs: only redact when there are >=7 digits, so years (2026),
+    // figures (£10,000) and thresholds (4 ng/L) are left intact.
+    .replace(/\+?\d[\d\s().-]{5,}\d/g, (m) =>
+      m.replace(/\D/g, "").length >= 7 ? "[redacted phone]" : m,
+    );
+}
+
 function rateLimited(ipHash: string): boolean {
   const now = Date.now();
   const b = rateBuckets.get(ipHash);
@@ -231,9 +249,9 @@ export async function POST(req: Request) {
           retrieval_count, top_score, model, input_tokens, output_tokens,
           latency_ms, ip_hash, user_agent, error
         ) VALUES (
-          ${requestId}, ${question}, ${scope.type}, ${scope.ref}, ${fields.status},
+          ${requestId}, ${redactContactDetails(question)}, ${scope.type}, ${scope.ref}, ${fields.status},
           ${fields.gateOnTopic ?? null}, ${fields.gateReason ?? null},
-          ${fields.answer ?? null}, ${JSON.stringify(fields.citations ?? [])}::jsonb,
+          ${fields.answer ? redactContactDetails(fields.answer) : null}, ${JSON.stringify(fields.citations ?? [])}::jsonb,
           ${fields.retrievalCount ?? null}, ${fields.topScore ?? null},
           ${fields.model ?? null}, ${fields.inputTokens ?? null}, ${fields.outputTokens ?? null},
           ${Date.now() - startedAt}, ${ipHash}, ${userAgent}, ${fields.error ?? null}

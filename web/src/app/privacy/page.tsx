@@ -379,7 +379,10 @@ export default function PrivacyPage() {
         <ul className="space-y-2 mt-3 mb-4 text-sm text-gray-700 dark:text-gray-300 list-disc pl-5">
           <li>
             The question you type, the answer generated, and which sources were
-            used are stored in the site&rsquo;s database.
+            used are stored in the site&rsquo;s database. Before storing, obvious
+            contact details (email addresses, phone numbers, and postcodes) are
+            automatically stripped out. We do not ask for, or attempt to identify,
+            your name.
           </li>
           <li>
             A one-way, salted <em>hash</em> of your IP address (never the address

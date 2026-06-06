@@ -200,6 +200,88 @@ async function dbRateExceeded(ipHash: string): Promise<boolean> {
   }
 }
 
+// --- User-agent denylist -----------------------------------------------------
+// Real browsers always send a normal User-Agent; scripted clients have telltale
+// ones. Block the obvious automation signatures (and empty UAs) outright. Extend
+// via ASK_BLOCKED_UAS (comma-separated, case-insensitive substrings).
+const DEFAULT_BLOCKED_UA = [
+  "curl/", "wget", "python-requests", "python-urllib", "aiohttp", "httpx",
+  "go-http-client", "node-fetch", "axios/", "undici", "got/", "okhttp",
+  "apache-httpclient", "java/", "jakarta", "libwww-perl", "lwp::", "guzzlehttp",
+  "scrapy", "httpclient", "phantomjs", "headlesschrome", "puppeteer",
+  "playwright", "selenium", "bot", "crawler", "spider", "scraper",
+];
+const BLOCKED_UA = [
+  ...DEFAULT_BLOCKED_UA,
+  ...(process.env.ASK_BLOCKED_UAS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+];
+
+function isBlockedUserAgent(ua: string): boolean {
+  const u = ua.trim().toLowerCase();
+  if (u.length < 8) return true; // empty or implausibly short — not a real browser
+  return BLOCKED_UA.some((p) => u.includes(p));
+}
+
+// --- Hard block (IP + user-agent abuse) --------------------------------------
+// A stable (non-rotating) pseudonymous key for an IP+UA pair, used ONLY for the
+// abuse blocklist — never stored against a question. Lets a hard block outlast
+// the hourly ip_hash rotation. Only ever computed/stored for confirmed abusers.
+function blockKey(ip: string, ua: string): string {
+  const salt = process.env.IP_HASH_SALT || "jerseyvotes-default-salt";
+  return createHash("sha256")
+    .update(`block:${salt}:${ip}:${ua}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+// Unrealistic volume from one IP+UA in an hour → hard block (403) for a day.
+const HARD_LIMIT = Number(process.env.ASK_HARD_LIMIT || "30"); // attempts/hr per IP+UA
+const HARD_BLOCK_SECONDS = Number(process.env.ASK_HARD_BLOCK_SECONDS || "86400"); // 24h
+const comboBuckets = new Map<string, { count: number; resetAt: number }>();
+
+// Per-IP+UA attempt counter (in-memory, rolling hour). Counts ALL attempts,
+// including ones the soft limiter rejects, so a hammering client is detected.
+function bumpCombo(key: string): number {
+  const now = Date.now();
+  if (comboBuckets.size > 5000) {
+    for (const [k, v] of comboBuckets) if (now > v.resetAt) comboBuckets.delete(k);
+  }
+  const b = comboBuckets.get(key);
+  if (!b || now > b.resetAt) {
+    comboBuckets.set(key, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return 1;
+  }
+  b.count += 1;
+  return b.count;
+}
+
+async function isHardBlocked(key: string): Promise<boolean> {
+  try {
+    const rows = (await sql`
+      SELECT 1 FROM ask_blocks WHERE block_key = ${key} AND expires_at > now() LIMIT 1
+    `) as unknown[];
+    return rows.length > 0;
+  } catch {
+    return false; // never block legitimate traffic on a DB hiccup
+  }
+}
+
+async function addHardBlock(key: string, reason: string): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO ask_blocks (block_key, reason, expires_at)
+      VALUES (${key}, ${reason}, now() + (${HARD_BLOCK_SECONDS} * interval '1 second'))
+      ON CONFLICT (block_key)
+      DO UPDATE SET expires_at = EXCLUDED.expires_at, reason = EXCLUDED.reason
+    `;
+  } catch (e) {
+    console.error("[ask] addHardBlock failed:", e);
+  }
+}
+
 type Scope = { type: "site" | "candidate" | "hustings"; ref: string | null };
 
 function parseScope(raw: unknown): Scope {
@@ -264,14 +346,38 @@ export async function POST(req: Request) {
 
   const question = String(body.question ?? "").trim();
   const scope = parseScope(body.scope);
-  const ipHash = hashIp(clientIp(req));
+  const ip = clientIp(req);
+  const ipHash = hashIp(ip);
   const userAgent = req.headers.get("user-agent") || "";
+  const bkey = blockKey(ip, userAgent);
 
   if (!question) return Response.json({ error: "Empty question" }, { status: 400 });
   if (question.length > MAX_QUESTION_CHARS) {
     return Response.json(
       { error: `Question too long (max ${MAX_QUESTION_CHARS} characters).` },
       { status: 400 },
+    );
+  }
+  // Block obvious automation by user-agent, then any IP+UA already hard-blocked
+  // for abuse — before doing any work.
+  if (isBlockedUserAgent(userAgent)) {
+    return Response.json(
+      { error: "Automated access to this feature isn't allowed." },
+      { status: 403 },
+    );
+  }
+  if (await isHardBlocked(bkey)) {
+    return Response.json(
+      { error: "Access to Ask has been temporarily blocked due to unusual activity." },
+      { status: 403 },
+    );
+  }
+  // Unrealistic volume from a single IP+UA in an hour → hard block from here on.
+  if (bumpCombo(bkey) > HARD_LIMIT) {
+    await addHardBlock(bkey, `auto: >${HARD_LIMIT} requests/hour from one IP+UA`);
+    return Response.json(
+      { error: "Access to Ask has been temporarily blocked due to unusual activity." },
+      { status: 403 },
     );
   }
   // In-memory first (cheap, blocks same-instance floods without a DB hit), then

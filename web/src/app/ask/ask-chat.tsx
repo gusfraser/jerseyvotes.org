@@ -226,6 +226,11 @@ export function AskChat({
         </button>
       </form>
 
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        Please don&rsquo;t enter personal information about yourself or anyone else
+        &mdash; this service is only for asking questions about the election.
+      </p>
+
       {variant === "page" && (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Tip: ask about one topic at a time — and one candidate, or all — for the

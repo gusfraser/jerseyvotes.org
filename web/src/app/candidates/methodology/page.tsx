@@ -835,6 +835,174 @@ export default async function MethodologyPage() {
         </SubSection>
       </Section>
 
+      {/* Ask feature (AI Q&A / RAG) */}
+      <Section title='The “Ask” feature (AI Q&A)'>
+        <Prose>
+          <p>
+            Alongside the candidate matcher, the site offers an optional{" "}
+            <Link href="/ask" className="text-red-700 hover:underline">
+              Ask
+            </Link>{" "}
+            feature: you type a question about the 2026 election and get an answer
+            assembled entirely from candidates&rsquo; published manifestos and what
+            they said at hustings, with a link back to every source. It is a
+            retrieval-augmented generation (RAG) system, deliberately built to{" "}
+            <strong>quote, not opine</strong> &mdash; it surfaces what candidates
+            said and never adds outside facts or a view of its own.
+          </p>
+        </Prose>
+
+        <SubSection title="What it searches">
+          <Prose>
+            <p>
+              The same public material used elsewhere on the site: every
+              candidate&rsquo;s manifesto (their fuller published platform where we
+              have one, otherwise their vote.je listing) and the transcripts of
+              recorded hustings. Candidates who have opted out are excluded, exactly
+              as on their profile.
+            </p>
+            <p>
+              Each document is split into passages (&ldquo;chunks&rdquo;) and turned
+              into a numeric <em>embedding</em> with{" "}
+              <ExternalLink href="https://www.voyageai.com">Voyage AI</ExternalLink>{" "}
+              (<Code>voyage-3.5-lite</Code>, 1024 dimensions). The vectors are stored
+              in Postgres via <Code>pgvector</Code> with an HNSW index and searched
+              by cosine similarity. The indexer is{" "}
+              <Code>pipeline/build_rag_index.py</Code>.
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="What happens when you ask a question">
+          <ol className="mt-5 space-y-4">
+            <NumberedItem n={1} title="On-topic gate (Claude Haiku 4.5)">
+              A fast first pass classifies the question before any retrieval. It
+              admits only questions about the Jersey 2026 election and its policy
+              issues, and short-circuits four kinds of request without searching:
+              off-topic questions; requests for voting advice
+              (&ldquo;who should I vote for?&rdquo;); questions about how this
+              service handles your data (answered with a link to the privacy
+              notice); and requests to label or judge candidates (see{" "}
+              <em>Neutrality</em> below). It also expands your wording into related
+              search terms to improve recall.
+            </NumberedItem>
+            <NumberedItem n={2} title="Retrieve">
+              The search terms are embedded and the nearest passages are pulled from
+              pgvector by cosine similarity. Results are filtered to the current
+              scope (the whole site, or a single candidate / hustings when you ask
+              from their page), exclude opted-out candidates, and drop anything below
+              a cosine similarity of roughly 0.3. By default a pool of about 48
+              passages is fetched site-wide, or 24 when scoped to one candidate or
+              event.
+            </NumberedItem>
+            <NumberedItem n={3} title="Diversify and de-duplicate">
+              To stop one talkative candidate crowding out the rest, the passages are
+              spread across candidates &mdash; at most two per candidate by default,
+              up to twenty in total, with any remaining budget filled by similarity.
+              Where many candidates of one party share an identical manifesto, that
+              passage is collapsed into a single party-attributed entry instead of
+              being repeated for each of them.
+            </NumberedItem>
+            <NumberedItem n={4} title="Synthesise (Claude Sonnet 4.5)">
+              The model receives <em>only</em> those retrieved passages as its
+              sources and returns a structured answer &mdash; a short framing line,
+              a list of verbatim quotes grouped by candidate (or party), and an
+              optional caveat &mdash; via a tool call, so the output is structured
+              data rather than free-form text.
+            </NumberedItem>
+            <NumberedItem n={5} title="Verbatim grounding check">
+              Every quote the model returns is string-matched back to the source
+              passage it cited; any quote that is not an exact substring is dropped.
+              The model cannot put words in a candidate&rsquo;s mouth &mdash; if it
+              isn&rsquo;t in the source, it doesn&rsquo;t ship. This is the same
+              verbatim-quote anchor used by the candidate scorer.
+            </NumberedItem>
+          </ol>
+
+          <Callout title="Determinism">
+            Both the gate and the synthesis run at temperature 0, so the same
+            question over the same corpus returns the same grounded answer. The
+            response is streamed: the search progress (how many passages, from how
+            many candidates) arrives first, then the finished, verified answer.
+          </Callout>
+        </SubSection>
+
+        <SubSection title="Neutrality and safety">
+          <Prose>
+            <p>
+              The Ask feature follows the same non-partisan rules as the rest of the
+              site, enforced at both the gate and the synthesis step:
+            </p>
+            <ul className="list-disc pl-5 space-y-1.5 text-sm sm:text-base text-gray-700 dark:text-gray-300">
+              <li>
+                It answers <strong>only</strong> questions about the Jersey 2026
+                election; everything else is declined.
+              </li>
+              <li>
+                It <strong>never recommends who to vote for</strong> and never ranks
+                candidates by preference.
+              </li>
+              <li>
+                It reports{" "}
+                <strong>what candidates said, not what they are</strong>: it will not
+                label a candidate or place them on a political spectrum
+                (&ldquo;conservative&rdquo;, &ldquo;left-wing&rdquo;), judge their
+                character, or apply a derogatory label
+                (&ldquo;racist&rdquo;, &ldquo;homophobic&rdquo;) &mdash; even if
+                asked. A candidate&rsquo;s own self-description can be quoted; a label
+                is never inferred.
+              </li>
+              <li>
+                It draws on <strong>only the retrieved passages</strong> &mdash; no
+                outside knowledge &mdash; and says plainly when no candidate
+                addresses the specific detail you asked about.
+              </li>
+            </ul>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="Data, privacy and abuse prevention">
+          <Prose>
+            <p>
+              Questions and the generated answers are logged so the feature can be
+              monitored for quality and abuse, with obvious contact details (email
+              addresses, phone numbers, postcodes) stripped before storage and only
+              a one-way, hourly-rotated hash of your IP address kept &mdash; never
+              the address itself. Requests are rate-limited, a one-time notice asks
+              you not to enter personal information, and the whole feature sits behind
+              a switch that can disable it instantly. Full detail is in the{" "}
+              <Link href="/privacy" className="text-red-700 hover:underline">
+                privacy notice
+              </Link>
+              .
+            </p>
+          </Prose>
+        </SubSection>
+
+        <SubSection title="Models and code">
+          <Prose>
+            <p>
+              Gate classifier: <Code>claude-haiku-4-5</Code>. Answer synthesis:{" "}
+              <Code>claude-sonnet-4-5</Code>. Embeddings: <Code>voyage-3.5-lite</Code>
+              . The route that orchestrates the whole pipeline is{" "}
+              <Code>web/src/app/api/ask/route.ts</Code>, versioned alongside the rest
+              of the site in the public repo at{" "}
+              <ExternalLink href="https://github.com/gusfraser/jerseyvotes.org">
+                github.com/gusfraser/jerseyvotes.org
+              </ExternalLink>
+              .
+            </p>
+          </Prose>
+        </SubSection>
+
+        <Callout title="Still AI — check the sources">
+          The Ask feature can misread or miss things, and it only knows the
+          manifestos and hustings we have indexed, so it will not reflect every
+          candidate on every topic. Every answer links to its sources; treat those
+          as the authority, not the summary.
+        </Callout>
+      </Section>
+
       {/* Limitations */}
       <Section title="Known limitations">
         <ul className="space-y-4 mt-2">

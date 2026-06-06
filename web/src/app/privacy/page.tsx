@@ -386,8 +386,10 @@ export default function PrivacyPage() {
           </li>
           <li>
             A one-way, salted <em>hash</em> of your IP address (never the address
-            itself) is stored for rate-limiting and abuse prevention. It is not
-            used to identify you or track you across the site.
+            itself) is stored for rate-limiting and abuse prevention. The salt is
+            rotated hourly, so the stored hash cannot be linked back to your IP
+            address or used to correlate your questions over time. It is not used
+            to identify you or track you across the site.
           </li>
           <li>
             Your question is sent to Anthropic and Voyage AI (United States) for

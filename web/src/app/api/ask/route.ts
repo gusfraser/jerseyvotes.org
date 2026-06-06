@@ -243,7 +243,7 @@ function blockKey(ip: string, ua: string): string {
 // A human can't read an answer in seconds, so >10 in a minute is clearly a bot.
 const BURST_MAX = Number(process.env.ASK_BURST_MAX || "10"); // attempts per burst window…
 const BURST_WINDOW_MS = Number(process.env.ASK_BURST_WINDOW_MS || "60000"); // …e.g. 10 / 60s
-const HARD_LIMIT = Number(process.env.ASK_HARD_LIMIT || "30"); // …or attempts / hour
+const HARD_LIMIT = Number(process.env.ASK_HARD_LIMIT || "20"); // …or attempts / hour (2× the soft cap)
 const HARD_BLOCK_SECONDS = Number(process.env.ASK_HARD_BLOCK_SECONDS || "86400"); // 24h block
 const comboBuckets = new Map<string, { count: number; resetAt: number }>();
 const burstBuckets = new Map<string, { count: number; resetAt: number }>();

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "About",
@@ -60,6 +61,75 @@ export default function AboutPage() {
             current electoral term (2022&ndash;present) to reflect today&apos;s
             Assembly. The full voting archive going back to 2004 is available
             through the Votes and Members pages.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-3">
+            Explore the site
+          </h2>
+          <p>
+            Ahead of the June 2026 States election, Jersey Votes also has a set of
+            tools focused on the candidates standing this time:
+          </p>
+          <ul className="mt-3 space-y-3">
+            <li>
+              <Link
+                href="/candidates"
+                className="text-red-700 hover:underline font-medium"
+              >
+                Candidates
+              </Link>{" "}
+              &mdash; browse everyone standing in 2026. Each profile sets out the
+              candidate&rsquo;s policy positions, extracted from their published
+              manifesto and tied to verbatim quotes you can check against the
+              original source.
+            </li>
+            <li>
+              <Link
+                href="/candidates/quiz"
+                className="text-red-700 hover:underline font-medium"
+              >
+                Voting Quiz
+              </Link>{" "}
+              &mdash; answer a short set of policy questions and see which
+              candidates&rsquo; published positions best match your own
+              priorities.
+            </li>
+            <li>
+              <Link
+                href="/hustings"
+                className="text-red-700 hover:underline font-medium"
+              >
+                Hustings
+              </Link>{" "}
+              &mdash; searchable transcripts of the recorded candidate debates,
+              broken down by topic, so you can read &mdash; and link to &mdash;
+              exactly what was said.
+            </li>
+            <li>
+              <Link
+                href="/ask"
+                className="text-red-700 hover:underline font-medium"
+              >
+                Ask
+              </Link>{" "}
+              &mdash; ask a question about the election in plain English and get an
+              answer drawn only from candidates&rsquo; published manifestos and
+              hustings statements, with a link to every source. It only answers
+              questions about the election and never recommends who to vote for.
+            </li>
+          </ul>
+          <p className="mt-4">
+            How candidate positions are extracted and scored, and how the Ask
+            feature works end to end, is documented in full on the{" "}
+            <Link
+              href="/candidates/methodology"
+              className="text-red-700 hover:underline font-medium"
+            >
+              methodology page
+            </Link>
+            .
           </p>
         </section>
 

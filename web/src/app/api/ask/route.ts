@@ -112,9 +112,23 @@ function clientIp(req: Request): string {
   );
 }
 
+// Pseudonymise the IP with a salt that rotates on a coarse time window (default
+// 1h). Within a window the same IP → the same hash, so rate-limiting works;
+// across windows the same IP → unrelated hashes, so stored hashes can't be
+// correlated over time or linked back to an IP. The window (>= the rate-limit
+// window) is far larger than the 5-min rate window, so a returning user only
+// gets a fresh rate bucket at most once per window boundary.
+// NOTE: the secret base salt (IP_HASH_SALT) MUST be set in production — without
+// it, IPv4 hashes would be brute-forceable even with rotation.
+const IP_HASH_ROTATE_MS = Number(process.env.IP_HASH_ROTATE_MS || "3600000"); // 1h
+
 function hashIp(ip: string): string {
-  const salt = process.env.IP_HASH_SALT || "jerseyvotes-default-salt";
-  return createHash("sha256").update(salt + ip).digest("hex").slice(0, 32);
+  const baseSalt = process.env.IP_HASH_SALT || "jerseyvotes-default-salt";
+  const windowId = Math.floor(Date.now() / IP_HASH_ROTATE_MS);
+  return createHash("sha256")
+    .update(`${baseSalt}:${windowId}:${ip}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 // Strip high-confidence personal contact details before we PERSIST text to

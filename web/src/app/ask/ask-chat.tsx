@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 // Shared chat client used by both the site-wide /ask page and the scoped
@@ -465,8 +465,38 @@ function RichText({ text, className = "" }: { text: string; className?: string }
 }
 
 function renderInline(line: string) {
-  const parts = line.split(/\*\*(.*?)\*\*/g);
-  return parts.map((p, j) =>
-    j % 2 === 1 ? <strong key={j}>{p}</strong> : <span key={j}>{p}</span>,
+  // Markdown links [label](url) first, then **bold** within the rest. Internal
+  // links (/privacy) use Next Link; external links open in a new tab.
+  const linkRe = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+  const out: ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  const linkCls = "text-red-700 dark:text-red-400 hover:underline font-medium";
+  while ((m = linkRe.exec(line)) !== null) {
+    if (m.index > last) pushBold(out, line.slice(last, m.index), i++);
+    const [, label, href] = m;
+    out.push(
+      href.startsWith("/") ? (
+        <Link key={`k${i++}`} href={href} className={linkCls}>
+          {label}
+        </Link>
+      ) : (
+        <a key={`k${i++}`} href={href} target="_blank" rel="noopener noreferrer" className={linkCls}>
+          {label}
+        </a>
+      ),
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < line.length) pushBold(out, line.slice(last), i++);
+  return out;
+}
+
+function pushBold(out: ReactNode[], text: string, idx: number) {
+  text.split(/\*\*(.*?)\*\*/g).forEach((p, j) =>
+    out.push(
+      j % 2 === 1 ? <strong key={`b${idx}-${j}`}>{p}</strong> : <span key={`b${idx}-${j}`}>{p}</span>,
+    ),
   );
 }

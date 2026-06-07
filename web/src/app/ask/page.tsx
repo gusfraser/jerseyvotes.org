@@ -33,11 +33,13 @@ export default async function AskPage() {
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-gray-100 tracking-tight mb-4">
           Ask about the election
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
-          Ask a question and get an answer drawn from candidates&rsquo; published
-          manifestos and what they said at hustings. Every answer links to its
-          sources so you can check the original.
-        </p>
+        {enabled && (
+          <p className="text-lg text-gray-600 dark:text-gray-400 leading-relaxed">
+            Ask a question and get an answer drawn from candidates&rsquo; published
+            manifestos and what they said at hustings. Every answer links to its
+            sources so you can check the original.
+          </p>
+        )}
       </header>
 
       {enabled ? (
@@ -45,31 +47,35 @@ export default async function AskPage() {
       ) : (
         <div className="bg-gray-50 dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-lg p-6 text-gray-600 dark:text-gray-400">
           <p className="font-medium text-gray-900 dark:text-gray-100 mb-1">
-            Ask is temporarily unavailable
+            Ask is no longer available
           </p>
           <p className="text-sm">
-            This feature is currently switched off. In the meantime, browse{" "}
+            Ask was a feature we ran in the lead-up to the 2026 Jersey election,
+            to help voters compare candidates in their own words. Now that voting
+            has closed, it&rsquo;s been switched off. You can still browse the{" "}
             <Link href="/candidates" className="text-red-700 dark:text-red-400 hover:underline">
               candidates
             </Link>{" "}
             and{" "}
             <Link href="/hustings" className="text-red-700 dark:text-red-400 hover:underline">
               hustings transcripts
-            </Link>{" "}
-            directly.
+            </Link>
+            .
           </p>
         </div>
       )}
 
-      <p className="mt-8 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-        This assistant only answers questions about the Jersey 2026 election. It
-        does not recommend who to vote for. Answers are AI-generated and may
-        contain mistakes &mdash; always verify against the linked sources. See our{" "}
-        <Link href="/privacy" className="hover:text-red-700">
-          privacy notice
-        </Link>{" "}
-        for how questions are handled.
-      </p>
+      {enabled && (
+        <p className="mt-8 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
+          This assistant only answers questions about the Jersey 2026 election. It
+          does not recommend who to vote for. Answers are AI-generated and may
+          contain mistakes &mdash; always verify against the linked sources. See our{" "}
+          <Link href="/privacy" className="hover:text-red-700">
+            privacy notice
+          </Link>{" "}
+          for how questions are handled.
+        </p>
+      )}
     </div>
   );
 }

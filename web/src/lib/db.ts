@@ -74,6 +74,13 @@ export function daysUntilElection(now: Date = new Date()): number {
   return Math.max(0, Math.ceil(ms / (1000 * 60 * 60 * 24)));
 }
 
+// Jersey polls close at 8pm on election day (BST = UTC+1, i.e. 19:00 UTC).
+// daysUntilElection clamps at 0, so use this to tell "election day" from "after".
+export const ELECTION_CLOSE = new Date("2026-06-07T19:00:00Z");
+export function pollsClosed(now: Date = new Date()): boolean {
+  return now.getTime() >= ELECTION_CLOSE.getTime();
+}
+
 // Parish / constituency constants live in `./parish` so client components
 // can import them without dragging in the DB driver. Re-exported here for
 // back-compat with existing `import { PARISHES, … } from "@/lib/db"` sites.

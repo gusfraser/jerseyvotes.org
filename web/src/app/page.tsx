@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { sql, daysUntilElection } from "@/lib/db";
+import { sql, daysUntilElection, pollsClosed } from "@/lib/db";
 import { isChatEnabled } from "@/lib/flags";
 import { TrackedLink } from "@/lib/track-click";
 
@@ -27,6 +27,7 @@ const JERSEY_CONSTITUENCIES = [
 
 export default async function Home() {
   const days = daysUntilElection();
+  const closed = pollsClosed();
   const chatEnabled = await isChatEnabled();
 
   const [statsResult, candidateStats, recentVotes, hustingsStatsRows] = await Promise.all([
@@ -75,7 +76,9 @@ export default async function Home() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
           <div className="flex items-center gap-3 mb-3">
             <span className="inline-flex items-center gap-2 bg-white/15 text-red-100 px-3 py-1 rounded-full text-sm font-medium">
-              <span className="w-2 h-2 bg-red-300 rounded-full animate-pulse" />
+              <span
+                className={`w-2 h-2 bg-red-300 rounded-full ${closed ? "" : "animate-pulse"}`}
+              />
               Jersey general election
             </span>
             <span className="text-red-200 text-sm">
@@ -88,47 +91,75 @@ export default async function Home() {
             </span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold mb-3 tracking-tight">
-            {days > 0 ? (
+            {closed ? (
+              "Polls have closed"
+            ) : days > 0 ? (
               <>
                 <span className="text-red-200">{days}</span>{" "}
                 {days === 1 ? "day" : "days"} until you vote
               </>
             ) : (
-              "Polls have opened"
+              "Polls are open"
             )}
           </h1>
           <p className="text-xl text-red-100 max-w-2xl mb-8">
-            Find the candidates whose priorities match yours. Free, independent,
-            and based on every candidate&rsquo;s own published manifesto.
+            {closed
+              ? "Voting in the 2026 Jersey election has closed. You can still explore the candidates who stood and their manifestos — and follow how Jersey’s States Assembly votes once the new members take their seats."
+              : "Find the candidates whose priorities match yours. Free, independent, and based on every candidate’s own published manifesto."}
           </p>
           <div className="flex flex-wrap gap-3">
-            <TrackedLink
-              href="/candidates/quiz"
-              event="home_cta_clicked"
-              params={{ cta: "find_your_candidate" }}
-              className="bg-white text-red-800 px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
-            >
-              Find your candidate &rarr;
-            </TrackedLink>
-            <TrackedLink
-              href="/candidates"
-              event="home_cta_clicked"
-              params={{ cta: "browse_candidates" }}
-              className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
-            >
-              {hasCandidateData
-                ? `Browse all ${totalCandidates} candidates`
-                : "Browse candidates"}
-            </TrackedLink>
-            {chatEnabled && (
-              <TrackedLink
-                href="/ask"
-                event="home_cta_clicked"
-                params={{ cta: "ask" }}
-                className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
-              >
-                Ask a question &rarr;
-              </TrackedLink>
+            {closed ? (
+              <>
+                <TrackedLink
+                  href="/candidates"
+                  event="home_cta_clicked"
+                  params={{ cta: "browse_candidates" }}
+                  className="bg-white text-red-800 px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+                >
+                  {hasCandidateData
+                    ? `Browse all ${totalCandidates} candidates`
+                    : "Browse candidates"}
+                </TrackedLink>
+                <TrackedLink
+                  href="/votes"
+                  event="home_cta_clicked"
+                  params={{ cta: "voting_record" }}
+                  className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+                >
+                  Explore the voting record &rarr;
+                </TrackedLink>
+              </>
+            ) : (
+              <>
+                <TrackedLink
+                  href="/candidates/quiz"
+                  event="home_cta_clicked"
+                  params={{ cta: "find_your_candidate" }}
+                  className="bg-white text-red-800 px-6 py-3 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+                >
+                  Find your candidate &rarr;
+                </TrackedLink>
+                <TrackedLink
+                  href="/candidates"
+                  event="home_cta_clicked"
+                  params={{ cta: "browse_candidates" }}
+                  className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+                >
+                  {hasCandidateData
+                    ? `Browse all ${totalCandidates} candidates`
+                    : "Browse candidates"}
+                </TrackedLink>
+                {chatEnabled && (
+                  <TrackedLink
+                    href="/ask"
+                    event="home_cta_clicked"
+                    params={{ cta: "ask" }}
+                    className="border border-white/30 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors"
+                  >
+                    Ask a question &rarr;
+                  </TrackedLink>
+                )}
+              </>
             )}
           </div>
           <p className="mt-4 text-sm text-red-200">
